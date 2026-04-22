@@ -13,12 +13,6 @@ Built with **MediaPipe Hands** + **TensorFlow.js** and deployed on **Vercel**.
 
 ---
 
-## 📸 Preview
-
-![Gesture Video Player Preview](preview.png)
-
----
-
 ## ✋ Supported Gestures
 
 | Gesture | Action |
