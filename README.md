@@ -1,46 +1,60 @@
-\# Gesture Controlled Video Player
+# 🖐️ Gesture Video Player
 
+A web-based video player controlled by **hand gestures** using your webcam.  
+No physical interaction needed — just show your hand to the camera!
 
+Built with **MediaPipe Hands** + **TensorFlow.js** and deployed on **Vercel**.
 
-Control HTML5 video playback using hand gestures detected via your webcam.
+---
 
+## 🌐 Live Demo
 
+🔗 [gesture-video-player.vercel.app](https://gesture-video-player.vercel.app)
 
-\## Gestures
+---
 
+## 📸 Preview
 
+![Gesture Video Player Preview](preview.png)
 
-| Gesture      | Action         |
+---
 
-|--------------|----------------|
+## ✋ Supported Gestures
 
-| 🖐️ Open Palm  | Play video     |
+| Gesture | Action |
+|---|---|
+| 🖐️ Open Palm | ▶️ Play Video |
+| ✊ Closed Fist | ⏸️ Pause Video |
+| 👆 Index Finger Up | 🔊 Volume Up |
+| 🤙 Pinky Finger Up | 🔉 Volume Down |
+| 👍 Thumbs Up | ⏩ Seek Forward 10s |
+| 👎 Thumbs Down | ⏪ Seek Backward 10s |
 
-| ✊ Closed Fist | Pause video    |
+---
 
-| 👉 Swipe Right | Forward +5s   |
+## 🚀 Features
 
-| 👈 Swipe Left  | Backward −5s  |
+- ✅ Real-time hand gesture recognition
+- ✅ Works directly in the browser — no app install needed
+- ✅ Uses device webcam
+- ✅ Lightweight and fast
+- ✅ Fully responsive design
+- ✅ No backend required — pure frontend
+- ✅ Works on Chrome and Edge
 
+---
 
+## 🛠️ Tech Stack
 
-\## Run Locally
+| Technology | Purpose |
+|---|---|
+| HTML5 | Structure |
+| CSS3 | Styling & Layout |
+| JavaScript (Vanilla) | Logic & Controls |
+| MediaPipe Hands | Hand tracking & detection |
+| TensorFlow.js | Machine learning in browser |
+| Vercel | Hosting & Deployment |
 
+---
 
-
-Just open `index.html` in a browser via a local server:
-
-
-
-```bash
-
-\# Python 3
-
-python -m http.server 8080
-
-
-
-\# Node.js (npx)
-
-npx serve .
-
+## 📁 Project Structure
