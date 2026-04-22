@@ -58,3 +58,10 @@ Built with **MediaPipe Hands** + **TensorFlow.js** and deployed on **Vercel**.
 ---
 
 ## 📁 Project Structure
+gesture-video-player/
+│
+├── index.html        # Main HTML file
+├── style.css         # All styling
+├── script.js         # Gesture logic & video controls
+└── README.md         # Project documentation
+
