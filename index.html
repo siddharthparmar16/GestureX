@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Gesture Controlled Video Player</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- MediaPipe CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <!-- Background Blobs -->
+  <div class="bg-blob blob-1"></div>
+  <div class="bg-blob blob-2"></div>
+  <div class="bg-blob blob-3"></div>
+
+  <div class="app-wrapper">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-icon">✋</div>
+      <div class="header-text">
+        <h1>Gesture Video Player</h1>
+        <p>Control playback with your hand</p>
+      </div>
+      <div class="status-pill" id="statusPill">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Initializing...</span>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+      <!-- Left: Video Player -->
+      <section class="player-section">
+        <div class="section-label">
+          <span class="label-icon">🎬</span> Video Player
+        </div>
+        <div class="video-container">
+          <video id="videoPlayer" loop>
+            <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4"/>
+            Your browser does not support HTML5 video.
+          </video>
+
+          <!-- Gesture Overlay -->
+          <div class="gesture-overlay" id="gestureOverlay">
+            <div class="gesture-badge" id="gestureBadge">
+              <span class="gesture-icon" id="gestureIcon">👋</span>
+              <span class="gesture-label" id="gestureLabel">Waiting...</span>
+            </div>
+          </div>
+
+          <!-- Seek Notification -->
+          <div class="seek-notify" id="seekNotify"></div>
+        </div>
+
+        <!-- Custom Video Controls -->
+        <div class="custom-controls">
+          <div class="progress-bar-wrap" id="progressWrap">
+            <div class="progress-fill" id="progressFill"></div>
+            <div class="progress-thumb" id="progressThumb"></div>
+          </div>
+          <div class="controls-row">
+            <div class="controls-left">
+              <button class="ctrl-btn" id="playPauseBtn" title="Play/Pause">
+                <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+                <svg id="pauseIcon" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                </svg>
+              </button>
+              <button class="ctrl-btn" id="seekBackBtn" title="Seek -5s">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/>
+                </svg>
+              </button>
+              <button class="ctrl-btn" id="seekFwdBtn" title="Seek +5s">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/>
+                </svg>
+              </button>
+              <div class="volume-wrap">
+                <button class="ctrl-btn" id="muteBtn" title="Mute">🔊</button>
+                <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1"/>
+              </div>
+            </div>
+            <div class="controls-right">
+              <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
+              <button class="ctrl-btn" id="fullscreenBtn" title="Fullscreen">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gesture Guide -->
+        <div class="gesture-guide">
+          <div class="guide-item">
+            <span class="guide-icon">🖐️</span>
+            <span class="guide-text">Open Palm → Play</span>
+          </div>
+          <div class="guide-item">
+            <span class="guide-icon">✊</span>
+            <span class="guide-text">Closed Fist → Pause</span>
+          </div>
+          <div class="guide-item">
+            <span class="guide-icon">👉</span>
+            <span class="guide-text">Swipe Right → +5s</span>
+          </div>
+          <div class="guide-item">
+            <span class="guide-icon">👈</span>
+            <span class="guide-text">Swipe Left → −5s</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: Webcam Feed -->
+      <section class="webcam-section">
+        <div class="section-label">
+          <span class="label-icon">📷</span> Hand Tracking
+        </div>
+        <div class="webcam-container">
+          <video id="webcam" autoplay playsinline muted></video>
+          <canvas id="handCanvas"></canvas>
+
+          <!-- Confidence Meter -->
+          <div class="confidence-bar-wrap">
+            <div class="confidence-fill" id="confidenceFill"></div>
+          </div>
+          <span class="confidence-label" id="confidenceLabel">Confidence: —</span>
+        </div>
+
+        <!-- Gesture Readout -->
+        <div class="gesture-readout" id="gestureReadout">
+          <div class="readout-row">
+            <span class="readout-key">Gesture</span>
+            <span class="readout-val" id="readoutGesture">None</span>
+          </div>
+          <div class="readout-row">
+            <span class="readout-key">Hand</span>
+            <span class="readout-val" id="readoutHand">—</span>
+          </div>
+          <div class="readout-row">
+            <span class="readout-key">Fingers</span>
+            <span class="readout-val" id="readoutFingers">—</span>
+          </div>
+          <div class="readout-row">
+            <span class="readout-key">Action</span>
+            <span class="readout-val" id="readoutAction">Waiting</span>
+          </div>
+        </div>
+
+        <!-- FPS Counter -->
+        <div class="fps-display" id="fpsDisplay">FPS: —</div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

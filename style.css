@@ -1,0 +1,577 @@
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg:           #0b0f1a;
+  --surface:      #131929;
+  --surface2:     #1a2236;
+  --border:       rgba(99, 179, 237, 0.12);
+  --accent:       #63b3ed;
+  --accent2:      #9f7aea;
+  --accent3:      #68d391;
+  --danger:       #fc8181;
+  --text:         #e2e8f0;
+  --text-muted:   #718096;
+  --radius:       16px;
+  --radius-sm:    8px;
+  --shadow:       0 8px 32px rgba(0,0,0,0.45);
+  --shadow-glow:  0 0 24px rgba(99, 179, 237, 0.15);
+  --transition:   0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* ============================================================
+   BACKGROUND BLOBS
+   ============================================================ */
+.bg-blob {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.08;
+  pointer-events: none;
+  z-index: 0;
+  animation: blobFloat 8s ease-in-out infinite alternate;
+}
+
+.blob-1 {
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, #63b3ed, transparent);
+  top: -150px; left: -150px;
+  animation-duration: 9s;
+}
+.blob-2 {
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, #9f7aea, transparent);
+  bottom: -100px; right: -100px;
+  animation-duration: 11s;
+}
+.blob-3 {
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, #68d391, transparent);
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  animation-duration: 13s;
+}
+
+@keyframes blobFloat {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(30px, 20px) scale(1.1); }
+}
+
+/* ============================================================
+   APP WRAPPER
+   ============================================================ */
+.app-wrapper {
+  position: relative;
+  z-index: 1;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+  padding: 20px 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+}
+
+.header-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 10px rgba(99,179,237,0.5));
+}
+
+.header-text {
+  flex: 1;
+}
+
+.header-text h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.3px;
+}
+
+.header-text p {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Status Pill */
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: var(--transition);
+}
+
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: background var(--transition), box-shadow var(--transition);
+}
+
+.status-pill.ready .status-dot {
+  background: var(--accent3);
+  box-shadow: 0 0 8px var(--accent3);
+}
+.status-pill.ready { color: var(--accent3); border-color: rgba(104,211,145,0.25); }
+
+.status-pill.error .status-dot  { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+.status-pill.error { color: var(--danger); border-color: rgba(252,129,129,0.25); }
+
+/* ============================================================
+   MAIN CONTENT (2-column grid)
+   ============================================================ */
+.main-content {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .main-content { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   SECTION LABELS
+   ============================================================ */
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.label-icon { font-size: 1rem; }
+
+/* ============================================================
+   VIDEO PLAYER SECTION
+   ============================================================ */
+.player-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.video-container {
+  position: relative;
+  width: 100%;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow), var(--shadow-glow);
+  aspect-ratio: 16 / 9;
+}
+
+#videoPlayer {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Gesture Overlay */
+.gesture-overlay {
+  position: absolute;
+  top: 16px; left: 16px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.gesture-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(11, 15, 26, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  transition: var(--transition);
+  opacity: 0.85;
+}
+
+.gesture-icon { font-size: 1.2rem; }
+.gesture-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.3px;
+}
+
+/* Seek Notification */
+.seek-notify {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  background: rgba(11, 15, 26, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(99,179,237,0.3);
+  border-radius: 12px;
+  padding: 10px 20px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 20;
+}
+
+.seek-notify.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* ============================================================
+   CUSTOM CONTROLS
+   ============================================================ */
+.custom-controls {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  box-shadow: var(--shadow);
+}
+
+/* Progress Bar */
+.progress-bar-wrap {
+  position: relative;
+  width: 100%;
+  height: 5px;
+  background: var(--surface2);
+  border-radius: 999px;
+  margin-bottom: 14px;
+  cursor: pointer;
+  overflow: visible;
+  transition: height var(--transition);
+}
+
+.progress-bar-wrap:hover { height: 7px; }
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 999px;
+  pointer-events: none;
+  transition: width 0.1s linear;
+}
+
+.progress-thumb {
+  position: absolute;
+  top: 50%;
+  left: 0%;
+  transform: translate(-50%, -50%) scale(0);
+  width: 14px; height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(99,179,237,0.6);
+  pointer-events: none;
+  transition: transform var(--transition), left 0.1s linear;
+}
+
+.progress-bar-wrap:hover .progress-thumb { transform: translate(-50%, -50%) scale(1); }
+
+/* Controls Row */
+.controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.controls-left, .controls-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ctrl-btn {
+  width: 36px; height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: var(--transition);
+}
+
+.ctrl-btn svg { width: 18px; height: 18px; }
+.ctrl-btn:hover {
+  background: rgba(99, 179, 237, 0.15);
+  border-color: rgba(99, 179, 237, 0.4);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.ctrl-btn:active { transform: translateY(0); }
+
+/* Volume */
+.volume-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#volumeSlider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 80px; height: 4px;
+  background: var(--surface2);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+  border: 1px solid var(--border);
+}
+
+#volumeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(99,179,237,0.5);
+}
+
+.time-display {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  padding: 0 6px;
+}
+
+/* ============================================================
+   GESTURE GUIDE
+   ============================================================ */
+.gesture-guide {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.guide-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  transition: var(--transition);
+}
+
+.guide-item:hover {
+  border-color: rgba(99,179,237,0.3);
+  color: var(--text);
+  background: var(--surface2);
+}
+
+.guide-icon { font-size: 1rem; }
+
+/* ============================================================
+   WEBCAM SECTION
+   ============================================================ */
+.webcam-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 20px;
+}
+
+.webcam-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow), 0 0 30px rgba(159, 122, 234, 0.1);
+}
+
+#webcam {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* Mirror webcam */
+}
+
+#handCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  transform: scaleX(-1);
+}
+
+/* Confidence Bar */
+.confidence-bar-wrap {
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 100%; height: 3px;
+  background: rgba(255,255,255,0.05);
+}
+
+.confidence-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent3), var(--accent));
+  border-radius: 0 999px 999px 0;
+  transition: width 0.3s ease;
+}
+
+.confidence-label {
+  position: absolute;
+  bottom: 8px; right: 10px;
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.5);
+  pointer-events: none;
+}
+
+/* ============================================================
+   GESTURE READOUT
+   ============================================================ */
+.gesture-readout {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow);
+}
+
+.readout-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.readout-row:last-child { border-bottom: none; padding-bottom: 0; }
+.readout-key { color: var(--text-muted); font-weight: 500; }
+
+.readout-val {
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* FPS Display */
+.fps-display {
+  text-align: right;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  padding: 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes ripple {
+  0%   { transform: scale(0.95); opacity: 1; }
+  100% { transform: scale(1.4);  opacity: 0; }
+}
+
+.gesture-badge.triggered {
+  animation: badgePop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes badgePop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border); }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 768px) {
+  .app-wrapper { padding: 16px 14px 32px; }
+  .header { flex-wrap: wrap; gap: 12px; padding: 16px 18px; }
+  .header-text h1 { font-size: 1.2rem; }
+  .gesture-guide { gap: 8px; }
+  .guide-item { font-size: 0.7rem; padding: 6px 10px; }
+  .webcam-section { position: static; }
+  #volumeSlider { width: 60px; }
+}
+
+@media (max-width: 480px) {
+  .status-pill { font-size: 0.7rem; padding: 6px 12px; }
+  .header-icon { font-size: 1.8rem; }
+  .controls-left { gap: 4px; }
+  #volumeSlider { display: none; }
+}
