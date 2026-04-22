@@ -82,15 +82,20 @@ const state = {
   // Video
   isPlaying:         false,
   isMuted:           false,
+
+  // ── NEW ── track whether 2x speed is active
+  is2xSpeed:         false,
 };
 
 // Gesture metadata: icon + label + action description
 const GESTURE_META = {
-  'open_palm':    { icon: '🖐️', label: 'Open Palm',    action: '▶ Play'       },
-  'closed_fist':  { icon: '✊', label: 'Closed Fist',  action: '⏸ Pause'      },
-  'swipe_right':  { icon: '👉', label: 'Swipe Right',  action: '⏩ +5 Seconds' },
-  'swipe_left':   { icon: '👈', label: 'Swipe Left',   action: '⏪ −5 Seconds' },
-  'none':         { icon: '✋', label: 'Waiting...',    action: '—'            },
+  'open_palm':    { icon: '🖐️', label: 'Open Palm',    action: '▶ Play'          },
+  'closed_fist':  { icon: '✊', label: 'Closed Fist',  action: '⏸ Pause'         },
+  'swipe_right':  { icon: '👉', label: 'Swipe Right',  action: '⏩ +5 Seconds'    },
+  'swipe_left':   { icon: '👈', label: 'Swipe Left',   action: '⏪ −5 Seconds'    },
+  // ── NEW ──
+  'cheese':       { icon: '✌️', label: 'Cheese!',      action: '⚡ 2× Speed'      },
+  'none':         { icon: '✋', label: 'Waiting...',    action: '—'               },
 };
 
 // ============================================================
@@ -168,6 +173,20 @@ function seekVideo(delta) {
   console.log(`[Player] Seeked ${delta > 0 ? '+' : ''}${delta}s → ${formatTime(newTime)}`);
 }
 
+// ── NEW ── Set playback speed and show notification
+function setPlaybackSpeed(rate) {
+  videoPlayer.playbackRate = rate;
+  state.is2xSpeed = rate === 2.0;
+
+  if (rate === 2.0) {
+    showSeekNotification('⚡ 2× Speed');
+    console.log('[Player] Playback speed set to 2×');
+  } else {
+    showSeekNotification('▶ 1× Speed');
+    console.log('[Player] Playback speed reset to 1×');
+  }
+}
+
 // Progress bar
 function updateProgress() {
   if (!videoPlayer.duration) return;
@@ -223,6 +242,13 @@ videoPlayer.addEventListener('pause',  updatePlayPauseUI);
 videoPlayer.addEventListener('ended',  updatePlayPauseUI);
 videoPlayer.addEventListener('loadedmetadata', updateProgress);
 
+// ── NEW ── Reset speed to 1× when video ends
+videoPlayer.addEventListener('ended', () => {
+  if (state.is2xSpeed) {
+    setPlaybackSpeed(1.0);
+  }
+});
+
 // ============================================================
 // GESTURE RECOGNITION
 // ============================================================
@@ -232,13 +258,6 @@ videoPlayer.addEventListener('loadedmetadata', updateProgress);
  * Returns array: [thumb, index, middle, ring, pinky] — 1 = extended
  */
 function getExtendedFingers(landmarks) {
-  // Landmark indices:
-  // Thumb: 4 (tip), 3, 2 (base)
-  // Index: 8 (tip), 7, 6, 5 (base)
-  // Middle: 12 tip, 11, 10, 9 base
-  // Ring:   16 tip, 15, 14, 13 base
-  // Pinky:  20 tip, 19, 18, 17 base
-
   const tips  = [4, 8, 12, 16, 20];
   const mids  = [3, 7, 11, 15, 19];
   const bases = [2, 6, 10, 14, 18];
@@ -249,12 +268,10 @@ function getExtendedFingers(landmarks) {
   const thumbExtended = Math.abs(landmarks[4].x - landmarks[2].x) > 0.04;
   fingers.push(thumbExtended ? 1 : 0);
 
-  // Other four fingers: tip y < pip y means extended (landmark y increases downward)
+  // Other four fingers: tip y < pip y means extended
   for (let i = 1; i < 5; i++) {
-    const tipY  = landmarks[tips[i]].y;
-    const midY  = landmarks[mids[i]].y;
-    const baseY = landmarks[bases[i]].y;
-    // Extended if tip is above mid (lower y value)
+    const tipY = landmarks[tips[i]].y;
+    const midY = landmarks[mids[i]].y;
     fingers.push(tipY < midY ? 1 : 0);
   }
 
@@ -266,11 +283,30 @@ function getExtendedFingers(landmarks) {
  */
 function classifyGesture(landmarks) {
   const fingers = getExtendedFingers(landmarks);
+
+  // fingers[0] = thumb
+  // fingers[1] = index
+  // fingers[2] = middle
+  // fingers[3] = ring
+  // fingers[4] = pinky
+
   const totalExtended = fingers.reduce((a, b) => a + b, 0);
 
   console.debug('[Gesture] Fingers extended:', fingers, '| Total:', totalExtended);
 
-  // Open Palm: 4+ fingers extended (excluding thumb for robustness)
+  // ── NEW ── Cheese / Peace / Victory gesture
+  // Index UP, Middle UP, Ring DOWN, Pinky DOWN
+  // Thumb can be either — not strict
+  if (
+    fingers[1] === 1 &&   // index up
+    fingers[2] === 1 &&   // middle up
+    fingers[3] === 0 &&   // ring down
+    fingers[4] === 0      // pinky down
+  ) {
+    return { name: 'cheese', confidence: 0.92 };
+  }
+
+  // Open Palm: all four fingers extended
   const fourOpen = fingers[1] + fingers[2] + fingers[3] + fingers[4];
   if (fourOpen >= 4) {
     return { name: 'open_palm', confidence: 0.9 + fourOpen * 0.02 };
@@ -291,23 +327,18 @@ function detectSwipe(landmarks) {
   const wrist = landmarks[0];
   const now   = Date.now();
 
-  // Add current wrist position
   state.swipeHistory.push({ x: wrist.x, y: wrist.y, t: now });
-
-  // Trim old entries
   state.swipeHistory = state.swipeHistory.filter(p => now - p.t < state.SWIPE_WINDOW_MS);
 
   if (state.swipeHistory.length < 5) return null;
 
   const first = state.swipeHistory[0];
   const last  = state.swipeHistory[state.swipeHistory.length - 1];
-  const dx    = last.x - first.x;   // Positive = moved right in normalised space
+  const dx    = last.x - first.x;
   const dy    = Math.abs(last.y - first.y);
 
-  // Must be predominantly horizontal
   if (dy > Math.abs(dx) * 0.8) return null;
 
-  // Note: webcam is mirrored, so visual right = negative dx in raw data
   if (dx < -state.SWIPE_THRESHOLD) {
     state.swipeHistory = [];
     return { name: 'swipe_right', confidence: 0.88 };
@@ -336,22 +367,39 @@ function dispatchGestureAction(gestureName) {
 
   // Animate badge
   gestureBadge.classList.remove('triggered');
-  void gestureBadge.offsetWidth; // Force reflow
+  void gestureBadge.offsetWidth;
   gestureBadge.classList.add('triggered');
 
   switch (gestureName) {
+
     case 'open_palm':
+      // Play and reset speed back to 1× when open palm shown
       if (videoPlayer.paused) playVideo();
+      if (state.is2xSpeed) setPlaybackSpeed(1.0);
       break;
+
     case 'closed_fist':
       if (!videoPlayer.paused) pauseVideo();
       break;
+
     case 'swipe_right':
       seekVideo(+5);
       break;
+
     case 'swipe_left':
       seekVideo(-5);
       break;
+
+    // ── NEW ── Cheese gesture → 2× speed
+    case 'cheese':
+      // Make sure video is playing first
+      if (videoPlayer.paused) playVideo();
+      // Only set if not already at 2×
+      if (!state.is2xSpeed) {
+        setPlaybackSpeed(2.0);
+      }
+      break;
+
     default:
       break;
   }
@@ -362,13 +410,12 @@ function dispatchGestureAction(gestureName) {
 // ============================================================
 function updateGestureUI(gestureName, confidence) {
   const meta = GESTURE_META[gestureName] || GESTURE_META['none'];
-  gestureIcon.textContent  = meta.icon;
-  gestureLabel.textContent = meta.label;
+  gestureIcon.textContent    = meta.icon;
+  gestureLabel.textContent   = meta.label;
   readoutGesture.textContent = meta.label;
 
-  // Confidence bar
   const pct = Math.min(100, Math.round(confidence * 100));
-  confidenceFill.style.width = `${pct}%`;
+  confidenceFill.style.width  = `${pct}%`;
   confidenceLabel.textContent = `Confidence: ${pct}%`;
 }
 
@@ -385,13 +432,11 @@ function drawHands(results) {
   results.multiHandLandmarks.forEach((landmarks, index) => {
     const handedness = results.multiHandedness?.[index]?.label || 'Unknown';
 
-    // Draw connectors (skeleton)
     drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {
       color: 'rgba(99, 179, 237, 0.7)',
       lineWidth: 2,
     });
 
-    // Draw landmark dots
     drawLandmarks(ctx, landmarks, {
       color: '#9f7aea',
       fillColor: 'rgba(159, 122, 234, 0.5)',
@@ -415,6 +460,24 @@ function drawHands(results) {
       ctx.stroke();
     });
 
+    // ── NEW ── Highlight index and middle tips in yellow when cheese gesture
+    const fingers = getExtendedFingers(landmarks);
+    if (fingers[1] === 1 && fingers[2] === 1 && fingers[3] === 0 && fingers[4] === 0) {
+      [8, 12].forEach(tipIdx => {
+        const lm = landmarks[tipIdx];
+        const cx = lm.x * handCanvas.width;
+        const cy = lm.y * handCanvas.height;
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 220, 50, 0.9)';
+        ctx.fill();
+        ctx.strokeStyle = '#ffd700';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
+    }
+
     // Hand label
     const wrist = landmarks[0];
     const lx = wrist.x * handCanvas.width;
@@ -423,8 +486,6 @@ function drawHands(results) {
     ctx.fillStyle = 'rgba(99, 179, 237, 0.9)';
     ctx.fillText(handedness, lx - 10, ly + 20);
 
-    // Update readout
-    const fingers = getExtendedFingers(landmarks);
     readoutHand.textContent    = handedness;
     readoutFingers.textContent = `${fingers.reduce((a, b) => a + b, 0)} / 5`;
   });
@@ -444,14 +505,13 @@ function initMediaPipe() {
   });
 
   hands.setOptions({
-    maxNumHands:          1,
-    modelComplexity:      1,
+    maxNumHands:            1,
+    modelComplexity:        1,
     minDetectionConfidence: 0.7,
     minTrackingConfidence:  0.6,
   });
 
   hands.onResults((results) => {
-    // Resize canvas to match webcam display size
     if (webcamEl.videoWidth > 0) {
       handCanvas.width  = webcamEl.videoWidth;
       handCanvas.height = webcamEl.videoHeight;
@@ -461,22 +521,20 @@ function initMediaPipe() {
     drawHands(results);
 
     if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
-      // No hand detected — reset gesture state
       if (state.currentGesture !== 'none') {
-        state.currentGesture = 'none';
+        state.currentGesture  = 'none';
         state.gestureHoldName = '';
         updateGestureUI('none', 0);
         readoutAction.textContent = 'Waiting';
       }
-      confidenceFill.style.width = '0%';
+      confidenceFill.style.width  = '0%';
       confidenceLabel.textContent = 'Confidence: —';
       return;
     }
 
-    // Use first detected hand
     const landmarks = results.multiHandLandmarks[0];
 
-    // --- Swipe detection (high priority) ---
+    // Swipe detection (high priority)
     const swipe = detectSwipe(landmarks);
     if (swipe) {
       state.currentGesture = swipe.name;
@@ -485,7 +543,7 @@ function initMediaPipe() {
       return;
     }
 
-    // --- Static gesture classification ---
+    // Static gesture classification
     const { name, confidence } = classifyGesture(landmarks);
     updateGestureUI(name, confidence);
 
@@ -495,14 +553,12 @@ function initMediaPipe() {
       return;
     }
 
-    // --- Gesture hold logic (prevents jitter triggering) ---
+    // Gesture hold logic
     if (name !== state.gestureHoldName) {
-      // New gesture started
       state.gestureHoldName  = name;
       state.gestureStartTime = Date.now();
       console.debug('[Gesture] Holding:', name);
     } else {
-      // Same gesture — check hold duration
       const heldMs = Date.now() - state.gestureStartTime;
       if (heldMs >= state.GESTURE_HOLD_MS) {
         if (name !== state.currentGesture) {
@@ -524,7 +580,6 @@ async function initWebcam(hands) {
   setStatus('Requesting camera...', 'init');
 
   try {
-    // Use MediaPipe Camera Utils for optimal frame delivery
     const camera = new Camera(webcamEl, {
       onFrame: async () => {
         await hands.send({ image: webcamEl });
@@ -549,7 +604,7 @@ async function initWebcam(hands) {
       setStatus('Camera error — check console', 'error');
     }
 
-    // Fallback: try getUserMedia directly
+    // Fallback
     try {
       console.log('[Webcam] Trying fallback getUserMedia...');
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -559,7 +614,6 @@ async function initWebcam(hands) {
       webcamEl.srcObject = stream;
       await webcamEl.play();
 
-      // Manual frame loop
       const processFrame = async () => {
         if (webcamEl.readyState >= 2) {
           await hands.send({ image: webcamEl });
@@ -584,30 +638,22 @@ async function initWebcam(hands) {
 async function boot() {
   console.log('=== Gesture Video Player Booting ===');
 
-  // Check browser support
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     setStatus('Browser not supported', 'error');
     console.error('[Boot] getUserMedia not supported');
     return;
   }
 
-  // Check HTTPS (MediaPipe requires secure context)
   if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
     console.warn('[Boot] Not on HTTPS — camera may be blocked');
     setStatus('HTTPS required for camera', 'error');
   }
 
-  // Init MediaPipe
   const hands = initMediaPipe();
-
-  // Short delay to let MediaPipe WASM load
   await new Promise(resolve => setTimeout(resolve, 500));
-
-  // Init webcam
   await initWebcam(hands);
 
   console.log('=== Boot complete ===');
 }
 
-// Start the app
 boot();
