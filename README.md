@@ -55,13 +55,4 @@ Built with **MediaPipe Hands** + **TensorFlow.js** and deployed on **Vercel**.
 | TensorFlow.js | Machine learning in browser |
 | Vercel | Hosting & Deployment |
 
----
-
-## 📁 Project Structure
-gesture-video-player/
-│
-├── index.html        # Main HTML file
-├── style.css         # All styling
-├── script.js         # Gesture logic & video controls
-└── README.md         # Project documentation
 
