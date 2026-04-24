@@ -18,6 +18,375 @@
   <div class="bg-blob blob-2"></div>
   <div class="bg-blob blob-3"></div>
 
+  <!-- ============================================================
+       AI GESTURE RECORDER MODAL
+       ============================================================ -->
+  <div class="modal-backdrop" id="aiRecorderBackdrop">
+    <div class="modal" id="aiRecorderModal">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-icon">🤖</span>
+          <div>
+            <h2>AI Gesture Recorder</h2>
+            <p>Show your hand — AI will learn your custom gesture</p>
+          </div>
+        </div>
+        <button class="modal-close" id="aiRecorderClose">✕</button>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- Step indicator -->
+        <div class="ai-steps">
+          <div class="ai-step active" id="aiStep1">
+            <span class="ai-step-num">1</span>
+            <span>Choose Action</span>
+          </div>
+          <div class="ai-step-line"></div>
+          <div class="ai-step" id="aiStep2">
+            <span class="ai-step-num">2</span>
+            <span>Show Gesture</span>
+          </div>
+          <div class="ai-step-line"></div>
+          <div class="ai-step" id="aiStep3">
+            <span class="ai-step-num">3</span>
+            <span>AI Analyzes</span>
+          </div>
+          <div class="ai-step-line"></div>
+          <div class="ai-step" id="aiStep4">
+            <span class="ai-step-num">4</span>
+            <span>Confirm</span>
+          </div>
+        </div>
+
+        <!-- Phase 1: Choose action -->
+        <div class="ai-phase" id="aiPhase1">
+          <p class="ai-phase-title">What action should this custom gesture trigger?</p>
+          <div class="ai-action-grid" id="aiActionGrid">
+            <button class="ai-action-btn" data-action="play">▶ Play</button>
+            <button class="ai-action-btn" data-action="pause">⏸ Pause</button>
+            <button class="ai-action-btn" data-action="seek_fwd">⏩ Seek +5s</button>
+            <button class="ai-action-btn" data-action="seek_back">⏪ Seek −5s</button>
+            <button class="ai-action-btn" data-action="vol_up">🔊 Volume Up</button>
+            <button class="ai-action-btn" data-action="vol_down">🔉 Volume Down</button>
+            <button class="ai-action-btn" data-action="mute">🔇 Mute Toggle</button>
+            <button class="ai-action-btn" data-action="fullscreen">⛶ Fullscreen</button>
+          </div>
+          <p class="ai-phase-hint">Selected: <strong id="aiSelectedAction">None</strong></p>
+        </div>
+
+        <!-- Phase 2: Camera preview & record -->
+        <div class="ai-phase hidden" id="aiPhase2">
+          <p class="ai-phase-title">Hold your custom gesture steady in front of the camera</p>
+          <div class="ai-camera-wrap">
+            <video id="aiRecorderWebcam" autoplay playsinline muted></video>
+            <canvas id="aiRecorderCanvas"></canvas>
+            <div class="ai-countdown-ring" id="aiCountdownRing">
+              <svg viewBox="0 0 100 100" class="ai-ring-svg">
+                <circle cx="50" cy="50" r="44" class="ai-ring-bg"/>
+                <circle cx="50" cy="50" r="44" class="ai-ring-fill" id="aiRingFill"/>
+              </svg>
+              <span class="ai-countdown-num" id="aiCountdownNum">3</span>
+            </div>
+            <div class="ai-hand-indicator" id="aiHandIndicator">
+              <span>✋ No hand detected</span>
+            </div>
+          </div>
+          <div class="ai-record-controls">
+            <button class="btn-record" id="aiStartRecord">🎥 Start Recording (3s)</button>
+            <p class="ai-phase-hint">Keep your gesture still during recording for best results</p>
+          </div>
+        </div>
+
+        <!-- Phase 3: AI analyzing -->
+        <div class="ai-phase hidden" id="aiPhase3">
+          <p class="ai-phase-title">AI is analyzing your gesture...</p>
+          <div class="ai-analyzing-wrap">
+            <div class="ai-spinner"></div>
+            <p class="ai-analyzing-msg" id="aiAnalyzingMsg">Sending landmark data to Claude AI...</p>
+            <div class="ai-landmark-preview" id="aiLandmarkPreview">
+              <!-- Landmark visualization rendered here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 4: Confirm result -->
+        <div class="ai-phase hidden" id="aiPhase4">
+          <p class="ai-phase-title">AI detected your gesture!</p>
+          <div class="ai-result-card" id="aiResultCard">
+            <div class="ai-result-icon" id="aiResultIcon">✋</div>
+            <div class="ai-result-info">
+              <div class="ai-result-name" id="aiResultName">Custom Gesture</div>
+              <div class="ai-result-desc" id="aiResultDesc">Description loading...</div>
+              <div class="ai-result-action">Will trigger: <strong id="aiResultAction">—</strong></div>
+            </div>
+          </div>
+          <div class="ai-finger-viz" id="aiFingerViz">
+            <!-- Finger state chips rendered here -->
+          </div>
+          <p class="ai-phase-hint">You can rename this gesture before saving.</p>
+          <div class="ai-rename-row">
+            <label>Gesture Name:</label>
+            <input type="text" id="aiGestureName" class="ai-name-input" placeholder="e.g. Peace Sign" maxlength="30" />
+          </div>
+        </div>
+
+        <!-- Error phase -->
+        <div class="ai-phase hidden" id="aiPhaseError">
+          <div class="ai-error-wrap">
+            <div class="ai-error-icon">⚠️</div>
+            <p class="ai-error-msg" id="aiErrorMsg">Something went wrong.</p>
+            <button class="btn-record" id="aiRetryBtn">↺ Try Again</button>
+          </div>
+        </div>
+
+      </div><!-- end modal-body -->
+
+      <div class="modal-footer">
+        <button class="btn-reset" id="aiRecorderBack">← Back</button>
+        <div style="display:flex;gap:10px;">
+          <button class="btn-cancel" id="aiRecorderCancel">Cancel</button>
+          <button class="btn-save" id="aiRecorderSave" disabled>✓ Save Gesture</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- END AI RECORDER MODAL -->
+
+  <!-- ============================================================
+       GESTURE CUSTOMIZER MODAL
+       ============================================================ -->
+  <div class="modal-backdrop" id="customizerBackdrop">
+    <div class="modal" id="customizerModal">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-icon">⚙️</span>
+          <div>
+            <h2>Gesture Customizer</h2>
+            <p>Reassign gestures or record your own with AI</p>
+          </div>
+        </div>
+        <button class="modal-close" id="modalClose">✕</button>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- Info banner -->
+        <div class="modal-info">
+          <span>💡</span>
+          <span>Reassign built-in gestures below, or click <strong>🤖 Record Custom Gesture</strong> to teach the AI your own hand pose.</span>
+        </div>
+
+        <!-- AI Record Button -->
+        <button class="ai-record-trigger-btn" id="openAiRecorder">
+          <span>🤖</span>
+          <div>
+            <div style="font-weight:700;font-size:0.88rem;">Record Custom Gesture with AI</div>
+            <div style="font-size:0.75rem;opacity:0.7;margin-top:2px;">Show your hand to the camera — AI learns it instantly</div>
+          </div>
+          <span style="margin-left:auto;opacity:0.5;font-size:0.8rem;">→</span>
+        </button>
+
+        <!-- Custom Gestures Section (populated dynamically) -->
+        <div id="customGesturesSection" style="display:none;">
+          <div class="customizer-section-title">
+            <span>🤖 Your Custom Gestures</span>
+            <button class="btn-clear-custom" id="clearAllCustom">Remove All</button>
+          </div>
+          <div class="customizer-table" id="customGesturesTable">
+            <!-- Dynamic rows injected here -->
+          </div>
+        </div>
+
+        <!-- Built-in Gestures -->
+        <div class="customizer-section-title" style="margin-top:16px;">
+          <span>🖐️ Built-in Gestures</span>
+        </div>
+
+        <!-- Gesture rows -->
+        <div class="customizer-table">
+          <div class="customizer-head">
+            <span>Gesture</span>
+            <span>Assigned Action</span>
+            <span>Preview</span>
+          </div>
+
+          <!-- open_palm -->
+          <div class="customizer-row" data-gesture="open_palm">
+            <div class="customizer-gesture">
+              <span class="cg-icon">🖐️</span>
+              <div>
+                <div class="cg-name">Open Palm</div>
+                <div class="cg-desc">All 4 fingers extended</div>
+              </div>
+            </div>
+            <select class="action-select" data-gesture="open_palm">
+              <option value="play">▶ Play</option>
+              <option value="pause">⏸ Pause</option>
+              <option value="seek_fwd">⏩ Seek +5s</option>
+              <option value="seek_back">⏪ Seek −5s</option>
+              <option value="vol_up">🔊 Volume Up</option>
+              <option value="vol_down">🔉 Volume Down</option>
+              <option value="mute">🔇 Mute Toggle</option>
+              <option value="fullscreen">⛶ Fullscreen</option>
+              <option value="none">— None (Disable)</option>
+            </select>
+            <span class="cg-preview" data-gesture="open_palm">▶ Play</span>
+          </div>
+
+          <!-- closed_fist -->
+          <div class="customizer-row" data-gesture="closed_fist">
+            <div class="customizer-gesture">
+              <span class="cg-icon">✊</span>
+              <div>
+                <div class="cg-name">Closed Fist</div>
+                <div class="cg-desc">All fingers folded</div>
+              </div>
+            </div>
+            <select class="action-select" data-gesture="closed_fist">
+              <option value="play">▶ Play</option>
+              <option value="pause">⏸ Pause</option>
+              <option value="seek_fwd">⏩ Seek +5s</option>
+              <option value="seek_back">⏪ Seek −5s</option>
+              <option value="vol_up">🔊 Volume Up</option>
+              <option value="vol_down">🔉 Volume Down</option>
+              <option value="mute">🔇 Mute Toggle</option>
+              <option value="fullscreen">⛶ Fullscreen</option>
+              <option value="none">— None (Disable)</option>
+            </select>
+            <span class="cg-preview" data-gesture="closed_fist">⏸ Pause</span>
+          </div>
+
+          <!-- swipe_right -->
+          <div class="customizer-row" data-gesture="swipe_right">
+            <div class="customizer-gesture">
+              <span class="cg-icon">👉</span>
+              <div>
+                <div class="cg-name">Swipe Right</div>
+                <div class="cg-desc">Horizontal swipe rightward</div>
+              </div>
+            </div>
+            <select class="action-select" data-gesture="swipe_right">
+              <option value="play">▶ Play</option>
+              <option value="pause">⏸ Pause</option>
+              <option value="seek_fwd">⏩ Seek +5s</option>
+              <option value="seek_back">⏪ Seek −5s</option>
+              <option value="vol_up">🔊 Volume Up</option>
+              <option value="vol_down">🔉 Volume Down</option>
+              <option value="mute">🔇 Mute Toggle</option>
+              <option value="fullscreen">⛶ Fullscreen</option>
+              <option value="none">— None (Disable)</option>
+            </select>
+            <span class="cg-preview" data-gesture="swipe_right">⏩ Seek +5s</span>
+          </div>
+
+          <!-- swipe_left -->
+          <div class="customizer-row" data-gesture="swipe_left">
+            <div class="customizer-gesture">
+              <span class="cg-icon">👈</span>
+              <div>
+                <div class="cg-name">Swipe Left</div>
+                <div class="cg-desc">Horizontal swipe leftward</div>
+              </div>
+            </div>
+            <select class="action-select" data-gesture="swipe_left">
+              <option value="play">▶ Play</option>
+              <option value="pause">⏸ Pause</option>
+              <option value="seek_fwd">⏩ Seek +5s</option>
+              <option value="seek_back">⏪ Seek −5s</option>
+              <option value="vol_up">🔊 Volume Up</option>
+              <option value="vol_down">🔉 Volume Down</option>
+              <option value="mute">🔇 Mute Toggle</option>
+              <option value="fullscreen">⛶ Fullscreen</option>
+              <option value="none">— None (Disable)</option>
+            </select>
+            <span class="cg-preview" data-gesture="swipe_left">⏪ Seek −5s</span>
+          </div>
+
+          <!-- vol_up -->
+          <div class="customizer-row" data-gesture="vol_up">
+            <div class="customizer-gesture">
+              <span class="cg-icon">👆</span>
+              <div>
+                <div class="cg-name">Index Up</div>
+                <div class="cg-desc">Only index finger extended</div>
+              </div>
+            </div>
+            <select class="action-select" data-gesture="vol_up">
+              <option value="play">▶ Play</option>
+              <option value="pause">⏸ Pause</option>
+              <option value="seek_fwd">⏩ Seek +5s</option>
+              <option value="seek_back">⏪ Seek −5s</option>
+              <option value="vol_up">🔊 Volume Up</option>
+              <option value="vol_down">🔉 Volume Down</option>
+              <option value="mute">🔇 Mute Toggle</option>
+              <option value="fullscreen">⛶ Fullscreen</option>
+              <option value="none">— None (Disable)</option>
+            </select>
+            <span class="cg-preview" data-gesture="vol_up">🔊 Volume Up</span>
+          </div>
+
+          <!-- vol_down -->
+          <div class="customizer-row" data-gesture="vol_down">
+            <div class="customizer-gesture">
+              <span class="cg-icon">👇</span>
+              <div>
+                <div class="cg-name">Pinky Up</div>
+                <div class="cg-desc">Only pinky finger extended</div>
+              </div>
+            </div>
+            <select class="action-select" data-gesture="vol_down">
+              <option value="play">▶ Play</option>
+              <option value="pause">⏸ Pause</option>
+              <option value="seek_fwd">⏩ Seek +5s</option>
+              <option value="seek_back">⏪ Seek −5s</option>
+              <option value="vol_up">🔊 Volume Up</option>
+              <option value="vol_down">🔉 Volume Down</option>
+              <option value="mute">🔇 Mute Toggle</option>
+              <option value="fullscreen">⛶ Fullscreen</option>
+              <option value="none">— None (Disable)</option>
+            </select>
+            <span class="cg-preview" data-gesture="vol_down">🔉 Volume Down</span>
+          </div>
+
+          <!-- swipe_up -->
+          <div class="customizer-row" data-gesture="swipe_up">
+            <div class="customizer-gesture">
+              <span class="cg-icon">🤙</span>
+              <div>
+                <div class="cg-name">Swipe Up</div>
+                <div class="cg-desc">Vertical upward swipe</div>
+              </div>
+            </div>
+            <select class="action-select" data-gesture="swipe_up">
+              <option value="play">▶ Play</option>
+              <option value="pause">⏸ Pause</option>
+              <option value="seek_fwd">⏩ Seek +5s</option>
+              <option value="seek_back">⏪ Seek −5s</option>
+              <option value="vol_up">🔊 Volume Up</option>
+              <option value="vol_down">🔉 Volume Down</option>
+              <option value="mute">🔇 Mute Toggle</option>
+              <option value="fullscreen">⛶ Fullscreen</option>
+              <option value="none">— None (Disable)</option>
+            </select>
+            <span class="cg-preview" data-gesture="swipe_up">⛶ Fullscreen</span>
+          </div>
+
+        </div><!-- end customizer-table -->
+      </div><!-- end modal-body -->
+
+      <div class="modal-footer">
+        <button class="btn-reset" id="resetMappings">↺ Reset to Default</button>
+        <div style="display:flex;gap:10px;">
+          <button class="btn-cancel" id="cancelMappings">Cancel</button>
+          <button class="btn-save" id="saveMappings">✓ Save Changes</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <!-- END MODAL -->
+
   <div class="app-wrapper">
 
     <!-- Header -->
@@ -27,6 +396,10 @@
         <h1>Gesture Video Player</h1>
         <p>Control playback with your hand</p>
       </div>
+      <!-- Customize Button -->
+      <button class="customize-btn" id="openCustomizer">
+        <span>⚙️</span> Customize Gestures
+      </button>
       <div class="status-pill" id="statusPill">
         <span class="status-dot" id="statusDot"></span>
         <span id="statusText">Initializing...</span>
@@ -101,24 +474,9 @@
           </div>
         </div>
 
-        <!-- Gesture Guide -->
-        <div class="gesture-guide">
-          <div class="guide-item">
-            <span class="guide-icon">🖐️</span>
-            <span class="guide-text">Open Palm → Play</span>
-          </div>
-          <div class="guide-item">
-            <span class="guide-icon">✊</span>
-            <span class="guide-text">Closed Fist → Pause</span>
-          </div>
-          <div class="guide-item">
-            <span class="guide-icon">👉</span>
-            <span class="guide-text">Swipe Right → +5s</span>
-          </div>
-          <div class="guide-item">
-            <span class="guide-icon">👈</span>
-            <span class="guide-text">Swipe Left → −5s</span>
-          </div>
+        <!-- Gesture Guide (dynamic — updated from customizer) -->
+        <div class="gesture-guide" id="gestureGuide">
+          <!-- populated by JS -->
         </div>
       </section>
 
@@ -156,10 +514,25 @@
             <span class="readout-key">Action</span>
             <span class="readout-val" id="readoutAction">Waiting</span>
           </div>
+          <div class="readout-row">
+            <span class="readout-key">Volume</span>
+            <span class="readout-val" id="readoutVolume">100%</span>
+          </div>
         </div>
 
         <!-- FPS Counter -->
         <div class="fps-display" id="fpsDisplay">FPS: —</div>
+
+        <!-- Gesture History Log -->
+        <div class="gesture-history">
+          <div class="section-label" style="margin-bottom:8px;">
+            <span class="label-icon">📋</span> Gesture History
+          </div>
+          <ul class="history-list" id="historyList">
+            <li class="history-empty">No gestures yet...</li>
+          </ul>
+        </div>
+
       </section>
 
     </main>
