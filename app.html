@@ -1,0 +1,2364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Gesture Controlled Video Player</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-gradient-1: #e0eafc;
+      --bg-gradient-2: #cfdef3;
+      --bg-gradient-3: #f0f4ff;
+
+      --surface: rgba(255, 255, 255, 0.55);
+      --surface2: rgba(255, 255, 255, 0.75);
+      --surface-solid: #ffffff;
+
+      --border: rgba(255, 255, 255, 0.85);
+      --border-subtle: rgba(190, 210, 230, 0.45);
+
+      --accent: #2563eb;
+      --accent2: #7c3aed;
+      --accent3: #10b981;
+      --danger: #ef4444;
+
+      --text: #0f172a;
+      --text-muted: #475569;
+
+      --radius: 24px;
+      --radius-sm: 12px;
+
+      --shadow-soft: 0 12px 40px rgba(0, 0, 0, 0.04), 0 2px 10px rgba(0,0,0,0.02);
+      --shadow-glass: 0 8px 32px rgba(31, 38, 135, 0.05), inset 0 0 0 1px rgba(255, 255, 255, 0.95);
+      --transition: 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    html, body { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+      background: linear-gradient(-45deg, var(--bg-gradient-1), var(--bg-gradient-2), var(--bg-gradient-3));
+      background-size: 400% 400%;
+      animation: gradientBG 14s ease infinite;
+    }
+
+    @keyframes gradientBG {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .bg-blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(95px);
+      opacity: 0.36;
+      pointer-events: none;
+      z-index: 0;
+      animation: blobFloat 10s ease-in-out infinite alternate;
+      mix-blend-mode: multiply;
+    }
+    .blob-1 {
+      width: 520px; height: 520px;
+      background: radial-gradient(circle, rgba(124, 58, 237, 0.55), transparent 70%);
+      top: -180px; left: -180px;
+    }
+    .blob-2 {
+      width: 460px; height: 460px;
+      background: radial-gradient(circle, rgba(37, 99, 235, 0.5), transparent 70%);
+      bottom: -160px; right: -160px;
+      animation-delay: -2s;
+    }
+    .blob-3 {
+      width: 360px; height: 360px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.35), transparent 70%);
+      top: 45%; left: 50%;
+      transform: translate(-50%, -50%);
+      animation-delay: -4s;
+    }
+    @keyframes blobFloat {
+      from { transform: translate(0, 0) scale(1); }
+      to { transform: translate(45px, 30px) scale(1.1); }
+    }
+
+    #cursorGlow {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 999;
+      background: radial-gradient(520px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.45), transparent 42%);
+      mix-blend-mode: overlay;
+      transition: background .1s;
+    }
+
+    .app-wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 28px 20px 50px;
+      animation: pageIn .7s ease forwards;
+    }
+
+    @keyframes pageIn { from { opacity: 0; transform: translateY(18px);} to {opacity:1; transform:translateY(0);} }
+
+    .glass-panel {
+      background: var(--surface);
+      backdrop-filter: blur(22px) saturate(180%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-glass);
+      transition: var(--transition);
+    }
+    .glass-panel:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-soft), var(--shadow-glass);
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 30px;
+      padding: 22px 28px;
+    }
+    .header-icon { font-size: 2.4rem; }
+    .header-text { flex: 1; }
+    .header-text h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent; /* fallback */
+}
+    
+    .header-text p { font-size: .95rem; color: var(--text-muted); margin-top: 4px; }
+
+    .customize-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 20px;
+      background: var(--surface-solid);
+      border: 1px solid var(--border-subtle);
+      border-radius: 999px;
+      color: var(--accent);
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .customize-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(37,99,235,.15);
+      border-color: rgba(37,99,235,.3);
+    }
+
+    .status-pill {
+      display: flex; align-items: center; gap: 9px;
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-size: .85rem;
+      font-weight: 700;
+      border: 1px solid var(--border-subtle);
+      background: var(--surface2);
+      color: var(--text-muted);
+    }
+    .status-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+    .status-pill.ready { color: var(--accent3); border-color: rgba(16,185,129,.25); }
+    .status-pill.ready .status-dot { background: var(--accent3); box-shadow: 0 0 10px var(--accent3); }
+    .status-pill.error { color: var(--danger); border-color: rgba(239,68,68,.25); }
+    .status-pill.error .status-dot { background: var(--danger); box-shadow: 0 0 10px var(--danger); }
+
+    .main-content {
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      gap: 26px;
+      align-items: start;
+    }
+
+    .section-label {
+      display:flex; align-items:center; gap:10px;
+      font-size: .8rem; font-weight: 800;
+      letter-spacing: 1.4px; text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      padding-left: 6px;
+    }
+
+    .player-section, .webcam-section { display:flex; flex-direction:column; gap:16px; }
+
+    .video-container {
+      position: relative;
+      width: 100%;
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: #000;
+      border: 1px solid var(--border);
+      aspect-ratio: 16 / 9;
+      transition: var(--transition);
+      box-shadow: var(--shadow-glass), 0 16px 48px rgba(0,0,0,.12);
+    }
+    .video-container:hover { transform: translateY(-3px) scale(1.005); }
+    #videoPlayer { width:100%; height:100%; object-fit: contain; display:block; }
+
+    .gesture-overlay { position:absolute; top:20px; left:20px; z-index:10; pointer-events:none; }
+    .gesture-badge {
+      display:flex; align-items:center; gap:9px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255,255,255,.82);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 6px 20px rgba(0,0,0,.08);
+      font-weight: 800;
+    }
+
+    .seek-notify, .vol-notify {
+      position:absolute; z-index:20; opacity:0; pointer-events:none;
+      background: rgba(255,255,255,.92);
+      border: 1px solid #fff; border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.14);
+      transition: .3s;
+      font-weight: 800;
+    }
+    .seek-notify { top:50%; left:50%; transform: translate(-50%,-50%) scale(.85); padding: 13px 26px; color: var(--accent); }
+    .seek-notify.show { opacity:1; transform: translate(-50%,-50%) scale(1); }
+    .vol-notify { top:18px; right:18px; padding: 9px 16px; color: var(--accent2); transform: translateY(-8px); }
+    .vol-notify.show { opacity:1; transform: translateY(0); }
+
+    .custom-controls { padding: 16px 20px; }
+
+    .progress-bar-wrap {
+      position:relative; width:100%; height:8px; margin-bottom:16px;
+      border-radius:999px; cursor:pointer;
+      background: rgba(0,0,0,.06);
+      overflow: visible;
+    }
+    .progress-fill {
+      height:100%; width:0%;
+      border-radius:999px;
+      background: linear-gradient(90deg,var(--accent),var(--accent2));
+      box-shadow: 0 0 12px rgba(37,99,235,.28);
+    }
+    .progress-thumb {
+      position:absolute; top:50%; left:0%;
+      width:18px; height:18px;
+      transform: translate(-50%,-50%) scale(0);
+      border-radius:50%;
+      border: 3px solid var(--accent);
+      background: #fff;
+      transition: .2s;
+      opacity: 0;
+    }
+    .progress-bar-wrap:hover .progress-thumb { opacity:1; transform: translate(-50%,-50%) scale(1); }
+
+    .controls-row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .controls-left, .controls-right { display:flex; align-items:center; gap:10px; }
+
+    .ctrl-btn {
+      width:42px; height:42px;
+      display:flex; align-items:center; justify-content:center;
+      border-radius: var(--radius-sm);
+      background: var(--surface-solid);
+      border: 1px solid var(--border-subtle);
+      cursor:pointer;
+      transition: var(--transition);
+      color: var(--text);
+    }
+    .ctrl-btn svg { width:21px; height:21px; }
+    .ctrl-btn:hover {
+      color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 18px rgba(37,99,235,.14);
+      border-color: rgba(37,99,235,.25);
+    }
+
+    .volume-wrap { display:flex; align-items:center; gap:8px; margin-left: 4px; }
+    #volumeSlider {
+      -webkit-appearance:none; appearance:none;
+      width:95px; height:6px; border-radius:999px;
+      background: rgba(0,0,0,.06);
+      border:1px solid rgba(255,255,255,.6);
+      cursor:pointer;
+    }
+    #volumeSlider::-webkit-slider-thumb {
+      -webkit-appearance:none;
+      width:16px; height:16px;
+      border-radius:50%;
+      background:#fff; border:2px solid var(--accent);
+    }
+
+    .time-display { font-size:.84rem; color:var(--text-muted); font-weight:700; font-variant-numeric: tabular-nums; }
+
+    .gesture-guide { display:flex; flex-wrap:wrap; gap:10px; }
+    .guide-item {
+      display:flex; align-items:center; gap:8px;
+      padding: 9px 15px;
+      border-radius:999px;
+      border:1px solid var(--border-subtle);
+      background: var(--surface2);
+      color: var(--text-muted);
+      font-size:.84rem; font-weight: 700;
+      transition: var(--transition);
+    }
+    .guide-item:hover {
+      color: var(--accent);
+      transform: translateY(-2px);
+      border-color: rgba(37,99,235,.3);
+      background: #fff;
+    }
+    .guide-item-custom { border-color: rgba(124,58,237,.25); background: rgba(124,58,237,.08); }
+    .guide-ai-badge {
+      font-size:.62rem; font-weight:800; color:#fff;
+      padding:2px 7px; border-radius:6px;
+      background: linear-gradient(135deg,var(--accent),var(--accent2));
+    }
+
+    .webcam-section { position: sticky; top: 20px; }
+
+    .webcam-container {
+      position:relative;
+      width:100%;
+      aspect-ratio: 4 / 3;
+      border-radius: var(--radius);
+      overflow:hidden;
+      background:#000;
+      border:1px solid var(--border);
+      box-shadow: var(--shadow-glass), 0 14px 38px rgba(0,0,0,.1);
+      transition: var(--transition);
+    }
+    .webcam-container:hover { transform: translateY(-3px); }
+    #webcam, #handCanvas {
+      position:absolute; inset:0;
+      width:100%; height:100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+
+    .confidence-bar-wrap {
+      position:absolute; left:0; bottom:0;
+      width:100%; height:5px;
+      background: rgba(0,0,0,.35);
+    }
+    .confidence-fill {
+      width:0%; height:100%;
+      background: linear-gradient(90deg,var(--accent3),var(--accent));
+      transition: width .25s ease;
+    }
+    .confidence-label {
+      position:absolute; right:12px; bottom:10px;
+      color: rgba(255,255,255,.9);
+      font-size:.74rem; font-weight: 800;
+      text-shadow: 0 1px 4px rgba(0,0,0,.5);
+    }
+
+    .gesture-readout { padding: 18px 20px; display:flex; flex-direction:column; gap:12px; }
+    .readout-row {
+      display:flex; align-items:center; justify-content:space-between;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(0,0,0,.06);
+      font-size:.9rem;
+    }
+    .readout-row:last-child { border-bottom:none; padding-bottom:0; }
+    .readout-key { color: var(--text-muted); font-weight:700; }
+    .readout-val {
+      font-weight: 800;
+      color: var(--accent);
+      background: rgba(37,99,235,.09);
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .fps-display {
+      text-align:right;
+      color: var(--text-muted);
+      font-size:.8rem; font-weight:800;
+      padding: 0 4px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .gesture-history { padding: 16px 20px; }
+    .history-list {
+      list-style:none;
+      display:flex; flex-direction:column; gap:7px;
+      max-height: 210px;
+      overflow-y:auto;
+      padding-right: 6px;
+    }
+    .history-list::-webkit-scrollbar { width:6px; }
+    .history-list::-webkit-scrollbar-thumb { background: rgba(0,0,0,.12); border-radius: 4px; }
+
+    .history-empty {
+      color: var(--text-muted);
+      text-align:center;
+      padding: 12px 0;
+      font-style: italic;
+      font-weight: 600;
+      font-size: .85rem;
+    }
+    .history-item {
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding: 9px 12px;
+      background: #fff;
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      border-left: 4px solid transparent;
+      font-size: .84rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,.02);
+      animation: historyIn .25s ease;
+    }
+    .history-item.open_palm { border-left-color:#10b981; }
+    .history-item.closed_fist { border-left-color:#ef4444; }
+    .history-item.swipe_right { border-left-color:#2563eb; }
+    .history-item.swipe_left { border-left-color:#8b5cf6; }
+    .history-item.peace_sign { border-left-color:#f59e0b; }
+    .history-item.wave_lr { border-left-color:#06b6d4; }
+    .history-item.rock_up { border-left-color:#16a34a; }
+    .history-item.rock_down { border-left-color:#dc2626; }
+
+    @keyframes historyIn {
+      from { opacity:0; transform: translateX(-8px); }
+      to { opacity:1; transform: translateX(0); }
+    }
+
+    .history-gesture { display:flex; align-items:center; gap:8px; font-weight:700; color:var(--text); }
+    .history-time { color: var(--text-muted); font-size:.74rem; font-weight:600; }
+
+    .modal-backdrop {
+      position: fixed; inset:0;
+      background: rgba(15,23,42,.35);
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+      display:flex; align-items:center; justify-content:center;
+      padding: 20px;
+      opacity:0; pointer-events:none;
+      transition: .3s ease;
+    }
+    .modal-backdrop.open { opacity:1; pointer-events:all; }
+
+    .modal {
+      width: 100%;
+      max-width: 760px;
+      max-height: 90vh;
+      display:flex; flex-direction:column;
+      border-radius: 28px;
+      overflow:hidden;
+      background: rgba(255,255,255,.88);
+      border:1px solid rgba(255,255,255,.95);
+      box-shadow: 0 30px 80px rgba(0,0,0,.12);
+      transform: translateY(20px) scale(.96);
+      transition: .35s ease;
+    }
+    .modal-backdrop.open .modal { transform: translateY(0) scale(1); }
+
+    .modal-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding: 24px 30px 18px;
+      border-bottom:1px solid rgba(0,0,0,.06);
+    }
+    .modal-title { display:flex; align-items:center; gap:14px; }
+    .modal-icon { font-size:2rem; }
+    .modal-title h2 { font-size:1.7rem; font-weight:800; color:var(--text); }
+    .modal-title p { margin-top:4px; color:var(--text-muted); font-weight:600; }
+
+    .modal-close {
+      width:40px; height:40px;
+      display:flex; align-items:center; justify-content:center;
+      border-radius:50%;
+      border:1px solid var(--border-subtle);
+      background: #fff;
+      color: var(--text-muted);
+      cursor:pointer;
+      font-size:1.2rem;
+      transition: var(--transition);
+    }
+    .modal-close:hover { color:var(--danger); transform: rotate(90deg); }
+
+    .modal-body { flex:1; overflow-y:auto; padding: 22px 30px; }
+    .modal-body::-webkit-scrollbar { width:6px; }
+    .modal-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,.14); border-radius: 4px; }
+
+    .modal-info {
+      display:flex; align-items:flex-start; gap:10px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(37,99,235,.18);
+      background: rgba(37,99,235,.06);
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 18px;
+      font-weight: 600;
+    }
+
+    .ai-record-trigger-btn {
+      width:100%;
+      display:flex; align-items:center; gap:16px;
+      text-align:left;
+      padding: 18px 20px;
+      border-radius: 16px;
+      border: 1px solid var(--border-subtle);
+      background: linear-gradient(135deg,#fff,#eff4ff);
+      cursor:pointer;
+      transition: var(--transition);
+      margin-bottom: 20px;
+    }
+    .ai-record-trigger-btn:hover {
+      transform: translateY(-3px);
+      border-color: rgba(124,58,237,.26);
+      box-shadow: 0 14px 30px rgba(124,58,237,.12);
+    }
+
+    .customizer-section-title {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom: 10px;
+      color: var(--text-muted);
+      font-size:.82rem; font-weight:800;
+      text-transform: uppercase;
+      letter-spacing: 1.3px;
+      padding: 0 2px;
+    }
+
+    .btn-clear-custom {
+      border:1px solid rgba(239,68,68,.2);
+      background: rgba(239,68,68,.05);
+      color: var(--danger);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: .74rem; font-weight:700;
+      cursor:pointer;
+    }
+
+    .customizer-table { display:flex; flex-direction:column; gap:10px; }
+    .customizer-head {
+      display:grid; grid-template-columns: 1.5fr 1fr auto;
+      gap:12px;
+      padding: 0 14px 6px;
+      color: var(--text-muted);
+      font-size:.74rem; font-weight:800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .customizer-row {
+      display:grid; grid-template-columns: 1.5fr 1fr auto;
+      gap:12px; align-items:center;
+      background: #fff;
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 12px 14px;
+      transition: var(--transition);
+    }
+    .customizer-row:hover {
+      transform: translateY(-1px);
+      border-color: rgba(37,99,235,.25);
+      box-shadow: 0 10px 20px rgba(0,0,0,.04);
+    }
+    .customizer-row.changed {
+      border-color: rgba(37,99,235,.45);
+      background: rgba(37,99,235,.03);
+    }
+
+    .customizer-gesture { display:flex; align-items:center; gap:12px; }
+    .cg-icon { font-size:1.8rem; }
+    .cg-name { font-weight:800; color:var(--text); display:flex; align-items:center; gap:8px; font-size:1.02rem; }
+    .cg-desc { margin-top:2px; color:var(--text-muted); font-weight:600; }
+    .ai-tag-inline {
+      font-size: .62rem; font-weight:800; color:#fff;
+      padding: 2px 6px; border-radius: 5px;
+      background: linear-gradient(135deg,var(--accent),var(--accent2));
+    }
+
+    .action-select {
+      width:100%;
+      border-radius: 12px;
+      border: 1px solid var(--border-subtle);
+      padding: 10px 14px;
+      background: #f8fbff;
+      font-size: .94rem;
+      font-weight:700;
+      color: var(--text);
+      cursor:pointer;
+      outline:none;
+    }
+    .action-select:hover, .action-select:focus {
+      border-color: rgba(37,99,235,.5);
+      box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+      background: #fff;
+    }
+
+    .cg-preview {
+      font-size: .9rem; font-weight:800;
+      color: var(--accent);
+      border:1px solid rgba(37,99,235,.2);
+      background: rgba(37,99,235,.08);
+      border-radius:10px;
+      padding: 8px 13px;
+      min-width: 115px;
+      text-align:center;
+      white-space: nowrap;
+    }
+
+    .btn-remove-custom {
+      width:32px; height:32px;
+      border-radius: 8px;
+      border: 1px solid rgba(239,68,68,.2);
+      background: rgba(239,68,68,.06);
+      color: var(--danger);
+      cursor:pointer;
+    }
+
+    .modal-footer {
+      display:flex; align-items:center; justify-content:space-between;
+      padding: 16px 26px 20px;
+      background: rgba(255,255,255,.6);
+      border-top:1px solid rgba(0,0,0,.06);
+      gap: 12px;
+    }
+
+    .btn-reset {
+      border-radius: 12px;
+      border: 1px solid var(--border-subtle);
+      background: #fff;
+      color: var(--text-muted);
+      font-weight:700;
+      padding: 10px 18px;
+      cursor:pointer;
+    }
+    .btn-cancel {
+      border:none; background:transparent;
+      color: var(--text-muted);
+      font-weight:700;
+      padding: 10px 14px;
+      cursor:pointer;
+    }
+    .btn-save {
+      border:none;
+      border-radius: 14px;
+      background: linear-gradient(135deg,var(--accent),var(--accent2));
+      color:#fff;
+      font-weight: 800;
+      font-size: 1rem;
+      padding: 12px 24px;
+      cursor:pointer;
+      box-shadow: 0 10px 20px rgba(37,99,235,.28);
+    }
+    .btn-save:disabled { opacity:.5; cursor:not-allowed; box-shadow:none; }
+
+    .toast {
+      position:fixed; left:50%; bottom:26px;
+      transform: translateX(-50%) translateY(18px) scale(.95);
+      z-index: 2000;
+      opacity:0; pointer-events:none;
+      background: rgba(255,255,255,.95);
+      border:1px solid rgba(16,185,129,.3);
+      color: var(--accent3);
+      border-radius: 999px;
+      padding: 12px 22px;
+      font-weight:800;
+      box-shadow: 0 12px 28px rgba(0,0,0,.14);
+      transition: .3s ease;
+    }
+    .toast.show { opacity:1; transform: translateX(-50%) translateY(0) scale(1); }
+
+    .hidden { display:none !important; }
+
+    .ai-steps {
+      display:flex; align-items:center; gap:10px;
+      margin-bottom: 18px;
+    }
+    .ai-step {
+      display:flex; align-items:center; gap:8px;
+      color: var(--text-muted); font-weight:800; opacity:.6;
+    }
+    .ai-step-num {
+      width:28px; height:28px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      background:#fff; border:1px solid var(--border-subtle);
+      font-size:.85rem;
+    }
+    .ai-step.active { opacity:1; color:var(--text); }
+    .ai-step.active .ai-step-num {
+      color:#fff; border-color:transparent;
+      background: linear-gradient(135deg,var(--accent),var(--accent2));
+    }
+    .ai-step.done { opacity:1; color:var(--accent3); }
+    .ai-step-line {
+      flex:1; height:2px; border-radius:2px;
+      background: var(--border-subtle);
+    }
+
+    .ai-phase-title {
+      text-align:center; font-size:1.08rem;
+      font-weight:800; margin-bottom:14px;
+      color: var(--text);
+    }
+    .ai-phase-hint { text-align:center; color:var(--text-muted); font-weight:600; margin-top:10px; }
+
+    .ai-action-grid {
+      display:grid; grid-template-columns: repeat(4,1fr);
+      gap:10px;
+    }
+    .ai-action-btn {
+      padding: 12px 10px;
+      border-radius: 12px;
+      border:1px solid var(--border-subtle);
+      background:#fff;
+      color: var(--text-muted);
+      font-weight: 800;
+      cursor:pointer;
+      transition: var(--transition);
+    }
+    .ai-action-btn:hover { transform: translateY(-2px); border-color: rgba(37,99,235,.3); color:var(--accent); }
+    .ai-action-btn.selected {
+      color:#fff; border-color:transparent;
+      background: linear-gradient(135deg,var(--accent),var(--accent2));
+      box-shadow: 0 10px 20px rgba(37,99,235,.2);
+    }
+
+    .ai-camera-wrap {
+      position:relative;
+      width:100%; aspect-ratio: 4 / 3;
+      border-radius: 18px;
+      overflow:hidden;
+      background:#000;
+      border:1px solid rgba(255,255,255,.2);
+      margin-bottom: 14px;
+    }
+    #aiRecorderWebcam, #aiRecorderCanvas {
+      position:absolute; inset:0; width:100%; height:100%;
+      object-fit: cover; transform: scaleX(-1);
+    }
+
+    .ai-countdown-ring {
+      position:absolute; top:50%; left:50%;
+      transform: translate(-50%,-50%);
+      width:120px; height:120px;
+      display:flex; align-items:center; justify-content:center;
+      border-radius:50%;
+      background: rgba(255,255,255,.08);
+      opacity:0; transition:.2s;
+      pointer-events:none;
+    }
+    .ai-countdown-ring.active { opacity:1; }
+    .ai-ring-svg { position:absolute; inset:0; transform: rotate(-90deg); }
+    .ai-ring-bg { fill:none; stroke: rgba(255,255,255,.2); stroke-width:8; }
+    .ai-ring-fill { fill:none; stroke:#fff; stroke-width:8; stroke-linecap:round; }
+    .ai-countdown-num { font-size:2.5rem; font-weight:900; color:#fff; z-index:1; }
+
+    .ai-hand-indicator {
+      position:absolute; left:50%; bottom:12px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: rgba(255,255,255,.92);
+      border:1px solid #fff;
+      color: var(--text-muted);
+      font-weight:800;
+      padding:7px 14px;
+      font-size:.84rem;
+      white-space: nowrap;
+      pointer-events:none;
+    }
+    .ai-hand-indicator.detected {
+      background: var(--accent3);
+      color:#fff;
+      border-color: transparent;
+    }
+
+    .ai-record-controls { text-align:center; }
+    .btn-record {
+      border:none; border-radius: 14px;
+      background: linear-gradient(135deg,var(--accent3),#059669);
+      color:#fff; font-weight:800; font-size:1rem;
+      padding: 12px 24px;
+      cursor:pointer;
+    }
+
+    .ai-analyzing-wrap { display:flex; flex-direction:column; align-items:center; gap:14px; padding: 24px 0; }
+    .ai-spinner {
+      width:56px; height:56px;
+      border:4px solid rgba(37,99,235,.12);
+      border-top-color: var(--accent);
+      border-right-color: var(--accent2);
+      border-radius:50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .ai-analyzing-msg { color:var(--text); font-weight:700; }
+
+    .ai-result-card {
+      display:flex; align-items:center; gap:16px;
+      border-radius: 16px;
+      border:1px solid var(--border-subtle);
+      background:#fff;
+      padding: 16px 18px;
+      margin-bottom: 14px;
+    }
+    .ai-result-icon { font-size:2.5rem; }
+    .ai-result-name { font-size:1.2rem; font-weight:800; color:var(--text); margin-bottom:4px; }
+    .ai-result-desc { color:var(--text-muted); font-weight:600; margin-bottom:8px; }
+    .ai-result-action {
+      display:inline-block;
+      border-radius: 10px;
+      padding: 5px 10px;
+      background: rgba(37,99,235,.08);
+      color: var(--accent);
+      font-weight:800;
+    }
+
+    .ai-finger-viz { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom: 14px; }
+    .finger-chip {
+      border-radius:999px;
+      padding: 6px 12px;
+      font-size:.8rem; font-weight:800;
+      border:1px solid transparent;
+    }
+    .finger-chip.extended {
+      color:var(--accent3);
+      background: rgba(16,185,129,.1);
+      border-color: rgba(16,185,129,.2);
+    }
+    .finger-chip.folded {
+      color: var(--text-muted);
+      background: rgba(71,85,105,.06);
+      border-color: rgba(71,85,105,.1);
+    }
+
+    .ai-rename-row { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+    .ai-rename-row label { font-weight:800; color:var(--text); }
+    .ai-name-input {
+      border-radius: 12px;
+      border:2px solid var(--border-subtle);
+      background:#fff;
+      color: var(--text);
+      padding: 12px 14px;
+      font-size:.98rem;
+      font-weight:700;
+      outline:none;
+    }
+    .ai-name-input:focus {
+      border-color: rgba(37,99,235,.5);
+      box-shadow: 0 0 0 4px rgba(37,99,235,.13);
+    }
+
+    .ai-error-wrap { text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px; padding: 20px 0; }
+    .ai-error-icon { font-size:3rem; }
+    .ai-error-msg { color:var(--danger); font-weight:700; max-width: 420px; line-height:1.5; }
+
+    .gesture-pulse {
+      animation: pulseBadge .35s ease;
+      border-color: rgba(37,99,235,.45) !important;
+      box-shadow: 0 0 24px rgba(37,99,235,.25) !important;
+    }
+    @keyframes pulseBadge {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+
+    @media (max-width: 1050px) {
+      .main-content { grid-template-columns:1fr; }
+      .webcam-section { position:static; }
+    }
+
+    @media (max-width: 760px) {
+      .app-wrapper { padding: 18px 12px 30px; }
+      .header { flex-wrap:wrap; gap:12px; padding: 16px; }
+      .header-text h1 { font-size:1.55rem; }
+      .customizer-head, .customizer-row { grid-template-columns: 1fr 1fr; }
+      .customizer-head span:last-child, .cg-preview { display:none; }
+      .ai-action-grid { grid-template-columns: repeat(2,1fr); }
+      .modal { max-height: 95vh; }
+      .modal-body { padding: 14px; }
+      .modal-header { padding: 16px 16px 12px; }
+      .modal-footer { flex-direction:column; align-items:stretch; }
+    }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="cursorGlow"></div>
+  <div class="bg-blob blob-1"></div>
+  <div class="bg-blob blob-2"></div>
+  <div class="bg-blob blob-3"></div>
+
+  <div class="modal-backdrop" id="aiRecorderBackdrop">
+    <div class="modal" id="aiRecorderModal">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-icon">🤖</span>
+          <div>
+            <h2>AI Gesture Recorder</h2>
+            <p>Show your hand — AI will learn your custom gesture</p>
+          </div>
+        </div>
+        <button class="modal-close" id="aiRecorderClose">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="ai-steps">
+          <div class="ai-step active" id="aiStep1"><span class="ai-step-num">1</span><span>Choose Action</span></div>
+          <div class="ai-step-line"></div>
+          <div class="ai-step" id="aiStep2"><span class="ai-step-num">2</span><span>Show Gesture</span></div>
+          <div class="ai-step-line"></div>
+          <div class="ai-step" id="aiStep3"><span class="ai-step-num">3</span><span>AI Analyzes</span></div>
+          <div class="ai-step-line"></div>
+          <div class="ai-step" id="aiStep4"><span class="ai-step-num">4</span><span>Confirm</span></div>
+        </div>
+
+        <div class="ai-phase" id="aiPhase1">
+          <p class="ai-phase-title">What action should this custom gesture trigger?</p>
+          <div class="ai-action-grid" id="aiActionGrid">
+            <button class="ai-action-btn" data-action="play">▶ Play</button>
+            <button class="ai-action-btn" data-action="pause">⏸ Pause</button>
+            <button class="ai-action-btn" data-action="seek_fwd">⏩ Seek +5s</button>
+            <button class="ai-action-btn" data-action="seek_back">⏪ Seek −5s</button>
+            <button class="ai-action-btn" data-action="vol_up">🔊 Volume Up</button>
+            <button class="ai-action-btn" data-action="vol_down">🔉 Volume Down</button>
+            <button class="ai-action-btn" data-action="mute">🔇 Mute Toggle</button>
+            <button class="ai-action-btn" data-action="fullscreen">⛶ Fullscreen</button>
+          </div>
+          <p class="ai-phase-hint">Selected: <strong id="aiSelectedAction">None</strong></p>
+        </div>
+
+        <div class="ai-phase hidden" id="aiPhase2">
+          <p class="ai-phase-title">Hold your custom gesture steady in front of the camera</p>
+          <div class="ai-camera-wrap">
+            <video id="aiRecorderWebcam" autoplay playsinline muted></video>
+            <canvas id="aiRecorderCanvas"></canvas>
+            <div class="ai-countdown-ring" id="aiCountdownRing">
+              <svg viewBox="0 0 100 100" class="ai-ring-svg">
+                <circle cx="50" cy="50" r="44" class="ai-ring-bg"/>
+                <circle cx="50" cy="50" r="44" class="ai-ring-fill" id="aiRingFill"/>
+              </svg>
+              <span class="ai-countdown-num" id="aiCountdownNum">3</span>
+            </div>
+            <div class="ai-hand-indicator" id="aiHandIndicator"><span>✋ No hand detected</span></div>
+          </div>
+          <div class="ai-record-controls">
+            <button class="btn-record" id="aiStartRecord">🎥 Start Recording (3s)</button>
+            <p class="ai-phase-hint">Keep your gesture still during recording for best results</p>
+          </div>
+        </div>
+
+        <div class="ai-phase hidden" id="aiPhase3">
+          <p class="ai-phase-title">AI is analyzing your gesture...</p>
+          <div class="ai-analyzing-wrap">
+            <div class="ai-spinner"></div>
+            <p class="ai-analyzing-msg" id="aiAnalyzingMsg">Sending landmark data for analysis...</p>
+            <div class="ai-landmark-preview" id="aiLandmarkPreview"></div>
+          </div>
+        </div>
+
+        <div class="ai-phase hidden" id="aiPhase4">
+          <p class="ai-phase-title">AI detected your gesture!</p>
+          <div class="ai-result-card" id="aiResultCard">
+            <div class="ai-result-icon" id="aiResultIcon">✋</div>
+            <div class="ai-result-info">
+              <div class="ai-result-name" id="aiResultName">Custom Gesture</div>
+              <div class="ai-result-desc" id="aiResultDesc">Description loading...</div>
+              <div class="ai-result-action">Will trigger: <strong id="aiResultAction">—</strong></div>
+            </div>
+          </div>
+          <div class="ai-finger-viz" id="aiFingerViz"></div>
+          <p class="ai-phase-hint">You can rename this gesture before saving.</p>
+          <div class="ai-rename-row">
+            <label>Gesture Name:</label>
+            <input type="text" id="aiGestureName" class="ai-name-input" placeholder="e.g. Peace Sign" maxlength="30" />
+          </div>
+        </div>
+
+        <div class="ai-phase hidden" id="aiPhaseError">
+          <div class="ai-error-wrap">
+            <div class="ai-error-icon">⚠️</div>
+            <p class="ai-error-msg" id="aiErrorMsg">Something went wrong.</p>
+            <button class="btn-record" id="aiRetryBtn">↺ Try Again</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-reset" id="aiRecorderBack">← Back</button>
+        <div style="display:flex;gap:10px;">
+          <button class="btn-cancel" id="aiRecorderCancel">Cancel</button>
+          <button class="btn-save" id="aiRecorderSave" disabled>✓ Save Gesture</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="customizerBackdrop">
+    <div class="modal" id="customizerModal">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-icon">⚙️</span>
+          <div>
+            <h2>Gesture Customizer</h2>
+            <p>Reassign gestures or record your own with AI</p>
+          </div>
+        </div>
+        <button class="modal-close" id="modalClose">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-info">
+          <span>💡</span>
+          <span>Reassign built-in gestures below, or click <strong>🤖 Record Custom Gesture</strong> to teach your own hand pose.</span>
+        </div>
+
+        <button class="ai-record-trigger-btn" id="openAiRecorder">
+          <span style="font-size:1.8rem;">🤖</span>
+          <div>
+            <div style="font-weight:800;font-size:1rem;">Record Custom Gesture with AI</div>
+            <div style="font-size:.9rem;color:var(--text-muted);margin-top:2px;">Show your hand to the camera — AI learns it instantly</div>
+          </div>
+          <span style="margin-left:auto;opacity:.5;">→</span>
+        </button>
+
+        <div id="customGesturesSection" style="display:none;">
+          <div class="customizer-section-title">
+            <span>🤖 Your Custom Gestures</span>
+            <button class="btn-clear-custom" id="clearAllCustom">Remove All</button>
+          </div>
+          <div class="customizer-table" id="customGesturesTable"></div>
+        </div>
+
+        <div class="customizer-section-title" style="margin-top:10px;"><span>🖐️ Built-in Gestures</span></div>
+
+        <div class="customizer-table">
+          <div class="customizer-head">
+            <span>Gesture</span>
+            <span>Assigned Action</span>
+            <span>Preview</span>
+          </div>
+
+          <div class="customizer-row" data-gesture="open_palm">
+            <div class="customizer-gesture"><span class="cg-icon">🖐️</span><div><div class="cg-name">Open Palm</div><div class="cg-desc">All 4 fingers extended</div></div></div>
+            <select class="action-select" data-gesture="open_palm"></select>
+            <span class="cg-preview" data-gesture="open_palm"></span>
+          </div>
+
+          <div class="customizer-row" data-gesture="closed_fist">
+            <div class="customizer-gesture"><span class="cg-icon">✊</span><div><div class="cg-name">Closed Fist</div><div class="cg-desc">All fingers folded</div></div></div>
+            <select class="action-select" data-gesture="closed_fist"></select>
+            <span class="cg-preview" data-gesture="closed_fist"></span>
+          </div>
+
+          <div class="customizer-row" data-gesture="swipe_right">
+            <div class="customizer-gesture"><span class="cg-icon">👉</span><div><div class="cg-name">Swipe Right</div><div class="cg-desc">Horizontal swipe rightward</div></div></div>
+            <select class="action-select" data-gesture="swipe_right"></select>
+            <span class="cg-preview" data-gesture="swipe_right"></span>
+          </div>
+
+          <div class="customizer-row" data-gesture="swipe_left">
+            <div class="customizer-gesture"><span class="cg-icon">👈</span><div><div class="cg-name">Swipe Left</div><div class="cg-desc">Horizontal swipe leftward</div></div></div>
+            <select class="action-select" data-gesture="swipe_left"></select>
+            <span class="cg-preview" data-gesture="swipe_left"></span>
+          </div>
+
+          <div class="customizer-row" data-gesture="peace_sign">
+            <div class="customizer-gesture"><span class="cg-icon">✌️</span><div><div class="cg-name">Peace / Cheese</div><div class="cg-desc">Index + middle extended</div></div></div>
+            <select class="action-select" data-gesture="peace_sign"></select>
+            <span class="cg-preview" data-gesture="peace_sign"></span>
+          </div>
+
+          <div class="customizer-row" data-gesture="wave_lr">
+            <div class="customizer-gesture"><span class="cg-icon">👋</span><div><div class="cg-name">Wave (Left-Right)</div><div class="cg-desc">Hand oscillation L-R</div></div></div>
+            <select class="action-select" data-gesture="wave_lr"></select>
+            <span class="cg-preview" data-gesture="wave_lr"></span>
+          </div>
+
+          <div class="customizer-row" data-gesture="rock_up">
+            <div class="customizer-gesture"><span class="cg-icon">🤟</span><div><div class="cg-name">Rock Up</div><div class="cg-desc">Rock sign moving up</div></div></div>
+            <select class="action-select" data-gesture="rock_up"></select>
+            <span class="cg-preview" data-gesture="rock_up"></span>
+          </div>
+
+          <div class="customizer-row" data-gesture="rock_down">
+            <div class="customizer-gesture"><span class="cg-icon">🤟</span><div><div class="cg-name">Rock Down</div><div class="cg-desc">Rock sign moving down</div></div></div>
+            <select class="action-select" data-gesture="rock_down"></select>
+            <span class="cg-preview" data-gesture="rock_down"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-reset" id="resetMappings">↺ Reset to Default</button>
+        <div style="display:flex;gap:10px;">
+          <button class="btn-cancel" id="cancelMappings">Cancel</button>
+          <button class="btn-save" id="saveMappings">✓ Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-wrapper">
+    <header class="header glass-panel">
+      <div class="header-icon">✋</div>
+      <div class="header-text">
+        <h1>Gesture Video Player</h1>
+        <p>Control playback with your hand</p>
+      </div>
+      <a href="./landing.html" style="display:flex;align-items:center;gap:8px;padding:10px 18px;background:var(--surface-solid);border:1px solid var(--border-subtle);border-radius:999px;color:var(--text-muted);font-weight:700;font-size:.88rem;text-decoration:none;transition:var(--transition);" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">← Landing</a>
+      <button class="customize-btn" id="openCustomizer"><span>⚙️</span> Customize Gestures</button>
+      <div class="status-pill" id="statusPill"><span class="status-dot"></span><span id="statusText">Initializing...</span></div>
+    </header>
+
+    <main class="main-content">
+      <section class="player-section">
+        <div class="section-label"><span>🎬</span> Video Player</div>
+        <div class="video-container">
+          <video id="videoPlayer" loop>
+            <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4"/>
+            Your browser does not support HTML5 video.
+          </video>
+
+          <div class="gesture-overlay">
+            <div class="gesture-badge" id="gestureBadge">
+              <span class="gesture-icon" id="gestureIcon">✋</span>
+              <span class="gesture-label" id="gestureLabel">Waiting...</span>
+            </div>
+          </div>
+
+          <div class="seek-notify" id="seekNotify"></div>
+        </div>
+
+        <div class="custom-controls glass-panel">
+          <div class="progress-bar-wrap" id="progressWrap">
+            <div class="progress-fill" id="progressFill"></div>
+            <div class="progress-thumb" id="progressThumb"></div>
+          </div>
+          <div class="controls-row">
+            <div class="controls-left">
+              <button class="ctrl-btn" id="playPauseBtn" title="Play/Pause">
+                <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                <svg id="pauseIcon" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+              </button>
+              <button class="ctrl-btn" id="seekBackBtn" title="Seek -5s"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg></button>
+              <button class="ctrl-btn" id="seekFwdBtn" title="Seek +5s"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></button>
+              <div class="volume-wrap">
+                <button class="ctrl-btn" id="muteBtn" title="Mute">🔊</button>
+                <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1"/>
+              </div>
+            </div>
+            <div class="controls-right">
+              <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
+              <button class="ctrl-btn" id="fullscreenBtn" title="Fullscreen">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="gesture-guide" id="gestureGuide"></div>
+      </section>
+
+      <section class="webcam-section">
+        <div class="section-label"><span>📷</span> Hand Tracking</div>
+        <div class="webcam-container">
+          <video id="webcam" autoplay playsinline muted></video>
+          <canvas id="handCanvas"></canvas>
+          <div class="confidence-bar-wrap"><div class="confidence-fill" id="confidenceFill"></div></div>
+          <span class="confidence-label" id="confidenceLabel">Confidence: —</span>
+        </div>
+
+        <div class="gesture-readout glass-panel">
+          <div class="readout-row"><span class="readout-key">Gesture</span><span class="readout-val" id="readoutGesture">None</span></div>
+          <div class="readout-row"><span class="readout-key">Hand</span><span class="readout-val" id="readoutHand">—</span></div>
+          <div class="readout-row"><span class="readout-key">Fingers</span><span class="readout-val" id="readoutFingers">—</span></div>
+          <div class="readout-row"><span class="readout-key">Action</span><span class="readout-val" id="readoutAction">Waiting</span></div>
+          <div class="readout-row"><span class="readout-key">Volume</span><span class="readout-val" id="readoutVolume">100%</span></div>
+        </div>
+
+        <div class="fps-display" id="fpsDisplay">FPS: —</div>
+
+        <div class="gesture-history glass-panel">
+          <div class="section-label" style="margin-bottom:8px;"><span>📋</span> Gesture History</div>
+          <ul class="history-list" id="historyList">
+            <li class="history-empty">No gestures yet...</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    'use strict';
+
+    // FIX 1: Throttle cursor glow - only schedule one rAF at a time to avoid rAF pile-up
+    let _glowPending = false;
+    let _glowX = 0, _glowY = 0;
+    document.addEventListener('mousemove', (e) => {
+      _glowX = e.clientX; _glowY = e.clientY;
+      if (!_glowPending) {
+        _glowPending = true;
+        requestAnimationFrame(() => {
+          document.documentElement.style.setProperty('--mouse-x', `${_glowX}px`);
+          document.documentElement.style.setProperty('--mouse-y', `${_glowY}px`);
+          _glowPending = false;
+        });
+      }
+    });
+
+    let tfModel = null;
+    let gestureLabels = {};
+
+    async function loadMLModel() {
+      try {
+        tfModel = await tf.loadLayersModel('./tfjs_model/model.json');
+        const response = await fetch('./label_mapping.json');
+        gestureLabels = await response.json();
+        console.log('ML model loaded');
+      } catch (err) {
+        console.warn('ML model unavailable, using rule-based only.', err);
+      }
+    }
+    loadMLModel();
+
+    const videoPlayer = document.getElementById('videoPlayer');
+    const webcamEl = document.getElementById('webcam');
+    const handCanvas = document.getElementById('handCanvas');
+    const ctx = handCanvas.getContext('2d');
+
+    const statusPill = document.getElementById('statusPill');
+    const statusText = document.getElementById('statusText');
+
+    const gestureBadge = document.getElementById('gestureBadge');
+    const gestureIcon = document.getElementById('gestureIcon');
+    const gestureLabel = document.getElementById('gestureLabel');
+
+    const seekNotify = document.getElementById('seekNotify');
+
+    const readoutGesture = document.getElementById('readoutGesture');
+    const readoutHand = document.getElementById('readoutHand');
+    const readoutFingers = document.getElementById('readoutFingers');
+    const readoutAction = document.getElementById('readoutAction');
+    const readoutVolume = document.getElementById('readoutVolume');
+
+    const confidenceFill = document.getElementById('confidenceFill');
+    const confidenceLabel = document.getElementById('confidenceLabel');
+
+    const fpsDisplay = document.getElementById('fpsDisplay');
+
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const playIcon = document.getElementById('playIcon');
+    const pauseIcon = document.getElementById('pauseIcon');
+    const seekBackBtn = document.getElementById('seekBackBtn');
+    const seekFwdBtn = document.getElementById('seekFwdBtn');
+    const muteBtn = document.getElementById('muteBtn');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const progressWrap = document.getElementById('progressWrap');
+    const progressFill = document.getElementById('progressFill');
+    const progressThumb = document.getElementById('progressThumb');
+    const timeDisplay = document.getElementById('timeDisplay');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+    const historyList = document.getElementById('historyList');
+    const gestureGuide = document.getElementById('gestureGuide');
+
+    const openCustomizerBtn = document.getElementById('openCustomizer');
+    const customizerBackdrop = document.getElementById('customizerBackdrop');
+    const modalClose = document.getElementById('modalClose');
+    const cancelMappings = document.getElementById('cancelMappings');
+    const saveMappings = document.getElementById('saveMappings');
+    const resetMappings = document.getElementById('resetMappings');
+
+    const openAiRecorderBtn = document.getElementById('openAiRecorder');
+    const aiRecorderBackdrop = document.getElementById('aiRecorderBackdrop');
+    const aiRecorderClose = document.getElementById('aiRecorderClose');
+    const aiRecorderCancel = document.getElementById('aiRecorderCancel');
+    const aiRecorderBack = document.getElementById('aiRecorderBack');
+    const aiRecorderSave = document.getElementById('aiRecorderSave');
+    const aiRecorderWebcam = document.getElementById('aiRecorderWebcam');
+    const aiRecorderCanvas = document.getElementById('aiRecorderCanvas');
+    const aiRecorderCtx = aiRecorderCanvas.getContext('2d');
+    const aiStartRecord = document.getElementById('aiStartRecord');
+    const aiCountdownNum = document.getElementById('aiCountdownNum');
+    const aiCountdownRing = document.getElementById('aiCountdownRing');
+    const aiRingFill = document.getElementById('aiRingFill');
+    const aiHandIndicator = document.getElementById('aiHandIndicator');
+    const aiAnalyzingMsg = document.getElementById('aiAnalyzingMsg');
+    const aiLandmarkPreview = document.getElementById('aiLandmarkPreview');
+    const aiResultIcon = document.getElementById('aiResultIcon');
+    const aiResultName = document.getElementById('aiResultName');
+    const aiResultDesc = document.getElementById('aiResultDesc');
+    const aiResultAction = document.getElementById('aiResultAction');
+    const aiFingerViz = document.getElementById('aiFingerViz');
+    const aiGestureName = document.getElementById('aiGestureName');
+    const aiActionGrid = document.getElementById('aiActionGrid');
+    const aiSelectedAction = document.getElementById('aiSelectedAction');
+    const aiRetryBtn = document.getElementById('aiRetryBtn');
+    const customGesturesSection = document.getElementById('customGesturesSection');
+    const customGesturesTable = document.getElementById('customGesturesTable');
+    const clearAllCustomBtn = document.getElementById('clearAllCustom');
+
+    const DEFAULT_GESTURE_MAPPINGS = {
+      open_palm: 'play',
+      closed_fist: 'pause',
+      swipe_right: 'seek_fwd',
+      swipe_left: 'seek_back',
+      peace_sign: 'speed_2x_toggle',
+      wave_lr: 'fullscreen',
+      rock_up: 'vol_up',
+      rock_down: 'vol_down',
+    };
+
+    let gestureMappings = { ...DEFAULT_GESTURE_MAPPINGS };
+
+    const ACTION_DEFS = {
+      play: { label: '▶ Play', description: 'Play video' },
+      pause: { label: '⏸ Pause', description: 'Pause video' },
+      seek_fwd: { label: '⏩ Seek +5s', description: 'Skip forward 5s' },
+      seek_back: { label: '⏪ Seek −5s', description: 'Skip back 5s' },
+      vol_up: { label: '🔊 Volume Up', description: 'Increase volume' },
+      vol_down: { label: '🔉 Volume Down', description: 'Decrease volume' },
+      mute: { label: '🔇 Mute Toggle', description: 'Mute/unmute' },
+      fullscreen: { label: '⛶ Fullscreen', description: 'Toggle fullscreen' },
+      speed_2x_toggle: { label: '⏱ 2× Speed', description: 'Toggle 1x / 2x speed' },
+      none: { label: '— Disabled', description: 'Do nothing' }
+    };
+
+    const GESTURE_DISPLAY = {
+      open_palm: { icon: '🖐️', label: 'Open Palm' },
+      closed_fist: { icon: '✊', label: 'Closed Fist' },
+      swipe_right: { icon: '👉', label: 'Swipe Right' },
+      swipe_left: { icon: '👈', label: 'Swipe Left' },
+      peace_sign: { icon: '✌️', label: 'Peace / Cheese' },
+      wave_lr: { icon: '👋', label: 'Wave (L-R)' },
+      rock_up: { icon: '🤟', label: 'Rock Up' },
+      rock_down: { icon: '🤟', label: 'Rock Down' },
+      none: { icon: '✋', label: 'Waiting...' }
+    };
+
+    let customGestures = [];
+
+    const state = {
+      currentGesture: 'none',
+      lastActionTime: 0,
+      DEBOUNCE_MS: 700,
+      GESTURE_HOLD_MS: 300,
+      gestureStartTime: 0,
+      gestureHoldName: '',
+      swipeHistory: [],
+      waveHistory: [],
+      SWIPE_WINDOW_MS: 700,
+      SWIPE_THRESHOLD: 0.14,
+      frameTimestamps: [],
+      MAX_HISTORY: 20,
+      VOLUME_STEP: 0.08,
+      _mainPaused: false  // FIX 6: pause main hands loop when AI recorder is active
+    };
+
+    function setStatus(msg, type = 'init') {
+      statusText.textContent = msg;
+      statusPill.className = `status-pill ${type}`;
+      console.log('[Status]', msg);
+    }
+
+    function showSeekNotification(text) {
+      seekNotify.textContent = text;
+      seekNotify.classList.add('show');
+      clearTimeout(showSeekNotification._timer);
+      showSeekNotification._timer = setTimeout(() => seekNotify.classList.remove('show'), 850);
+    }
+
+    function showVolNotification(text) {
+      let volNotify = document.getElementById('volNotify');
+      if (!volNotify) {
+        volNotify = document.createElement('div');
+        volNotify.id = 'volNotify';
+        volNotify.className = 'vol-notify';
+        videoPlayer.closest('.video-container').appendChild(volNotify);
+      }
+      volNotify.textContent = text;
+      volNotify.classList.add('show');
+      clearTimeout(showVolNotification._timer);
+      showVolNotification._timer = setTimeout(() => volNotify.classList.remove('show'), 850);
+    }
+
+    function showToast(message) {
+      let toast = document.getElementById('appToast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'appToast';
+        toast.className = 'toast';
+        document.body.appendChild(toast);
+      }
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(showToast._timer);
+      showToast._timer = setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+    function formatTime(sec) {
+      if (!Number.isFinite(sec)) return '0:00';
+      const m = Math.floor(sec / 60);
+      const s = String(Math.floor(sec % 60)).padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function nowTime() {
+      const d = new Date();
+      return [d.getHours(), d.getMinutes(), d.getSeconds()].map(x => String(x).padStart(2, '0')).join(':');
+    }
+
+    function getActionOptionsHtml(selected) {
+      const keys = ['play', 'pause', 'seek_fwd', 'seek_back', 'vol_up', 'vol_down', 'mute', 'fullscreen', 'speed_2x_toggle', 'none'];
+      return keys.map(k => `<option value="${k}" ${selected === k ? 'selected' : ''}>${ACTION_DEFS[k].label}</option>`).join('');
+    }
+
+    function hydrateBuiltInActionSelects() {
+      document.querySelectorAll('.action-select[data-gesture]').forEach(select => {
+        const gesture = select.dataset.gesture;
+        select.innerHTML = getActionOptionsHtml(gestureMappings[gesture] || 'none');
+      });
+    }
+
+    function renderGestureGuide() {
+      gestureGuide.innerHTML = '';
+
+      Object.entries(gestureMappings).forEach(([gesture, action]) => {
+        if (action === 'none') return;
+        const g = GESTURE_DISPLAY[gesture];
+        const a = ACTION_DEFS[action];
+        if (!g || !a) return;
+
+        const item = document.createElement('div');
+        item.className = 'guide-item';
+        item.innerHTML = `<span>${g.icon}</span><span>${g.label} → ${a.label}</span>`;
+        gestureGuide.appendChild(item);
+      });
+
+      customGestures.forEach(cg => {
+        if (cg.action === 'none') return;
+        const a = ACTION_DEFS[cg.action];
+        if (!a) return;
+        const item = document.createElement('div');
+        item.className = 'guide-item guide-item-custom';
+        item.innerHTML = `<span>${cg.icon}</span><span>${cg.name} → ${a.label}</span><span class="guide-ai-badge">AI</span>`;
+        gestureGuide.appendChild(item);
+      });
+    }
+
+    function addToHistory(gestureName) {
+      const custom = customGestures.find(cg => cg.key === gestureName);
+      const display = custom ? { icon: custom.icon, label: custom.name } : (GESTURE_DISPLAY[gestureName] || GESTURE_DISPLAY.none);
+      const action = custom ? custom.action : (gestureMappings[gestureName] || 'none');
+      const actionDef = ACTION_DEFS[action] || ACTION_DEFS.none;
+
+      const empty = historyList.querySelector('.history-empty');
+      if (empty) empty.remove();
+
+      const li = document.createElement('li');
+      li.className = `history-item ${gestureName}`;
+      li.innerHTML = `<span class="history-gesture"><span>${display.icon}</span><span>${display.label} → ${actionDef.label}</span></span><span class="history-time">${nowTime()}</span>`;
+      historyList.prepend(li);
+
+      const items = historyList.querySelectorAll('.history-item');
+      if (items.length > state.MAX_HISTORY) items[items.length - 1].remove();
+    }
+
+    // FIX 5: Ring-buffer FPS counter — no array allocation or filter() on every frame
+    const _fpsRing = new Float64Array(64);
+    let _fpsHead = 0, _fpsCount = 0;
+    function updateFPS() {
+      const now = performance.now();
+      _fpsRing[_fpsHead] = now;
+      _fpsHead = (_fpsHead + 1) % 64;
+      if (_fpsCount < 64) _fpsCount++;
+      // Count frames within last 1000ms
+      let fps = 0;
+      for (let i = 0; i < _fpsCount; i++) if (now - _fpsRing[i] < 1000) fps++;
+      fpsDisplay.textContent = `FPS: ${fps}`;
+    }
+
+    function updatePlayPauseUI() {
+      const playing = !videoPlayer.paused;
+      playIcon.style.display = playing ? 'none' : '';
+      pauseIcon.style.display = playing ? '' : 'none';
+    }
+
+    function playVideo() { videoPlayer.play().catch(() => {}); updatePlayPauseUI(); }
+    function pauseVideo() { videoPlayer.pause(); updatePlayPauseUI(); }
+
+    function seekVideo(delta) {
+      videoPlayer.currentTime = clamp(videoPlayer.currentTime + delta, 0, videoPlayer.duration || 0);
+      showSeekNotification(delta > 0 ? `⏩ +${delta}s` : `⏪ ${delta}s`);
+    }
+
+    function changeVolume(delta) {
+      const newVol = clamp(videoPlayer.volume + delta, 0, 1);
+      videoPlayer.volume = newVol;
+      volumeSlider.value = newVol;
+      muteBtn.textContent = newVol === 0 ? '🔇' : '🔊';
+      const pct = Math.round(newVol * 100);
+      readoutVolume.textContent = `${pct}%`;
+      showVolNotification(`${delta > 0 ? '🔊' : '🔉'} ${pct}%`);
+    }
+
+    function toggleMute() {
+      videoPlayer.muted = !videoPlayer.muted;
+      muteBtn.textContent = videoPlayer.muted ? '🔇' : '🔊';
+    }
+
+    // Fullscreen proxy: browsers block requestFullscreen from non-user-gesture contexts
+    // (like MediaPipe callbacks). We route through a hidden button click to get a trusted event.
+    const _fsProxy = document.createElement('button');
+    _fsProxy.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;';
+    document.body.appendChild(_fsProxy);
+    _fsProxy.addEventListener('click', () => {
+      const container = videoPlayer.closest('.video-container');
+      if (!document.fullscreenElement) {
+        (container || document.documentElement).requestFullscreen?.().catch(() => {});
+      } else {
+        document.exitFullscreen?.();
+      }
+    });
+
+    function toggleFullscreen() {
+      _fsProxy.click();
+    }
+
+    function toggleSpeed2x() {
+      videoPlayer.playbackRate = videoPlayer.playbackRate === 2 ? 1 : 2;
+      showSeekNotification(videoPlayer.playbackRate === 2 ? '⏱ 2× Speed' : '⏱ 1× Speed');
+    }
+
+    function updateProgress() {
+      if (!videoPlayer.duration) return;
+      const pct = (videoPlayer.currentTime / videoPlayer.duration) * 100;
+      progressFill.style.width = `${pct}%`;
+      progressThumb.style.left = `${pct}%`;
+      timeDisplay.textContent = `${formatTime(videoPlayer.currentTime)} / ${formatTime(videoPlayer.duration)}`;
+    }
+
+    progressWrap.addEventListener('click', (e) => {
+      const rect = progressWrap.getBoundingClientRect();
+      const ratio = (e.clientX - rect.left) / rect.width;
+      videoPlayer.currentTime = ratio * (videoPlayer.duration || 0);
+    });
+
+    playPauseBtn.addEventListener('click', () => videoPlayer.paused ? playVideo() : pauseVideo());
+    seekBackBtn.addEventListener('click', () => seekVideo(-5));
+    seekFwdBtn.addEventListener('click', () => seekVideo(5));
+    muteBtn.addEventListener('click', toggleMute);
+    fullscreenBtn.addEventListener('click', toggleFullscreen);
+    volumeSlider.addEventListener('input', () => {
+      videoPlayer.volume = parseFloat(volumeSlider.value);
+      const pct = Math.round(videoPlayer.volume * 100);
+      readoutVolume.textContent = `${pct}%`;
+      muteBtn.textContent = videoPlayer.volume === 0 ? '🔇' : '🔊';
+    });
+    videoPlayer.addEventListener('timeupdate', updateProgress);
+    videoPlayer.addEventListener('loadedmetadata', updateProgress);
+    videoPlayer.addEventListener('play', updatePlayPauseUI);
+    videoPlayer.addEventListener('pause', updatePlayPauseUI);
+
+    function getExtendedFingers(lm) {
+      const tips = [4, 8, 12, 16, 20];
+      const mids = [3, 7, 11, 15, 19];
+      const fingers = [];
+      fingers.push(Math.abs(lm[4].x - lm[2].x) > 0.04 ? 1 : 0);
+      for (let i = 1; i < 5; i++) fingers.push(lm[tips[i]].y < lm[mids[i]].y ? 1 : 0);
+      return fingers;
+    }
+
+    // FIX 7: Avoid filter() allocating a new array every frame for swipe/wave history.
+    // Instead, splice from the front in-place.
+    function trimHistory(arr, windowMs) {
+      const cutoff = Date.now() - windowMs;
+      let i = 0;
+      while (i < arr.length && arr[i].t < cutoff) i++;
+      if (i > 0) arr.splice(0, i);
+    }
+
+    function detectSwipe(lm) {
+      const wrist = lm[0];
+      const now = Date.now();
+
+      state.swipeHistory.push({ x: wrist.x, y: wrist.y, t: now });
+      trimHistory(state.swipeHistory, state.SWIPE_WINDOW_MS);
+
+      if (state.swipeHistory.length < 5) return null;
+
+      const first = state.swipeHistory[0];
+      const last = state.swipeHistory[state.swipeHistory.length - 1];
+      const dx = last.x - first.x;
+      const dy = last.y - first.y;
+
+      if (Math.abs(dx) > state.SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        state.swipeHistory.length = 0;
+        return { name: dx < 0 ? 'swipe_right' : 'swipe_left', confidence: 0.88 };
+      }
+      return null;
+    }
+
+    function detectWave(lm) {
+      const now = Date.now();
+      const x = lm[0].x;
+      state.waveHistory.push({ x, t: now });
+      trimHistory(state.waveHistory, 950);
+      if (state.waveHistory.length < 6) return null;
+
+      let dirChanges = 0, prevDir = 0;
+      for (let i = 1; i < state.waveHistory.length; i++) {
+        const dx = state.waveHistory[i].x - state.waveHistory[i - 1].x;
+        const dir = dx > 0.01 ? 1 : dx < -0.01 ? -1 : 0;
+        if (dir !== 0 && prevDir !== 0 && dir !== prevDir) dirChanges++;
+        if (dir !== 0) prevDir = dir;
+      }
+      if (dirChanges >= 2) {
+        state.waveHistory.length = 0;
+        return { name: 'wave_lr', confidence: 0.85 };
+      }
+      return null;
+    }
+
+    function classifyGesture(lm) {
+      const fingers = getExtendedFingers(lm);
+      const total = fingers.reduce((a,b) => a + b, 0);
+
+      for (const cg of customGestures) {
+        if (!cg.fingerPattern || cg.fingerPattern.length !== 5) continue;
+        let matches = 0;
+        for (let i = 0; i < 5; i++) if (fingers[i] === cg.fingerPattern[i]) matches++;
+        if (matches === 5) return { name: cg.key, confidence: 0.92 };
+      }
+
+      if (fingers[1] + fingers[2] + fingers[3] + fingers[4] >= 4) return { name: 'open_palm', confidence: 0.92 };
+      if (total <= 1) return { name: 'closed_fist', confidence: 0.88 };
+
+      if (fingers[1] === 1 && fingers[2] === 1 && fingers[3] === 0 && fingers[4] === 0) {
+        return { name: 'peace_sign', confidence: 0.9 };
+      }
+
+      const rock = fingers[0] === 1 && fingers[1] === 1 && fingers[2] === 0 && fingers[3] === 0 && fingers[4] === 1;
+      if (rock && state.swipeHistory.length >= 4) {
+        const dy = state.swipeHistory[state.swipeHistory.length - 1].y - state.swipeHistory[0].y;
+        if (dy < -0.06) return { name: 'rock_up', confidence: 0.86 };
+        if (dy > 0.06) return { name: 'rock_down', confidence: 0.86 };
+      }
+
+      return { name: 'none', confidence: 0 };
+    }
+
+    // FIX 4: dataSync() blocks the main thread (GPU→CPU sync copy). 
+    // We now run TF synchronously but inside tidy to avoid memory leaks,
+    // and skip the call entirely when no model is loaded.
+    function classifyGestureML(lm) {
+      if (!tfModel) return { name: 'none', confidence: 0 };
+      const bx = lm[0].x, by = lm[0].y, bz = lm[0].z;
+      const features = [];
+      lm.forEach(p => features.push(p.x - bx, p.y - by, p.z - bz));
+
+      return tf.tidy(() => {
+        const input = tf.tensor2d([features]);
+        const pred = tfModel.predict(input);
+        // dataSync is unavoidable for sync result, but we minimise tensor lifetime with tidy
+        const scores = pred.dataSync();
+        let max = -1, idx = -1;
+        for (let i = 0; i < scores.length; i++) if (scores[i] > max) { max = scores[i]; idx = i; }
+        if (max > 0.6) return { name: gestureLabels[idx] || 'unknown', confidence: max };
+        return { name: 'none', confidence: max };
+      });
+    }
+
+    function executeAction(actionKey) {
+      switch (actionKey) {
+        case 'play': if (videoPlayer.paused) playVideo(); break;
+        case 'pause': if (!videoPlayer.paused) pauseVideo(); break;
+        case 'seek_fwd': seekVideo(5); break;
+        case 'seek_back': seekVideo(-5); break;
+        case 'vol_up': changeVolume(state.VOLUME_STEP); break;
+        case 'vol_down': changeVolume(-state.VOLUME_STEP); break;
+        case 'mute': toggleMute(); break;
+        case 'fullscreen': toggleFullscreen(); break;
+        case 'speed_2x_toggle': toggleSpeed2x(); break;
+        default: break;
+      }
+    }
+
+    function dispatchGestureAction(gestureName) {
+      const now = Date.now();
+      if (now - state.lastActionTime < state.DEBOUNCE_MS) return;
+      state.lastActionTime = now;
+
+      const custom = customGestures.find(cg => cg.key === gestureName);
+      const action = custom ? custom.action : (gestureMappings[gestureName] || 'none');
+      if (action === 'none') return;
+
+      readoutAction.textContent = ACTION_DEFS[action]?.label || '—';
+
+      gestureBadge.classList.remove('gesture-pulse');
+      void gestureBadge.offsetWidth;
+      gestureBadge.classList.add('gesture-pulse');
+
+      addToHistory(gestureName);
+      executeAction(action);
+    }
+
+    function updateGestureUI(gestureName, confidence) {
+      const custom = customGestures.find(cg => cg.key === gestureName);
+      const disp = custom ? { icon: custom.icon, label: custom.name } : (GESTURE_DISPLAY[gestureName] || GESTURE_DISPLAY.none);
+
+      gestureIcon.textContent = disp.icon;
+      gestureLabel.textContent = disp.label;
+      readoutGesture.textContent = disp.label;
+
+      const pct = Math.min(100, Math.round(confidence * 100));
+      confidenceFill.style.width = `${pct}%`;
+      confidenceLabel.textContent = `Confidence: ${pct}%`;
+    }
+
+    function drawHands(results) {
+      ctx.clearRect(0, 0, handCanvas.width, handCanvas.height);
+      if (!results.multiHandLandmarks?.length) return;
+
+      results.multiHandLandmarks.forEach((lm, i) => {
+        const hand = results.multiHandedness?.[i]?.label || 'Unknown';
+        drawConnectors(ctx, lm, HAND_CONNECTIONS, { color: 'rgba(99,179,237,.7)', lineWidth: 2 });
+        drawLandmarks(ctx, lm, { color: '#9f7aea', fillColor: 'rgba(159,122,234,.45)', lineWidth: 1, radius: 4 });
+
+        [4,8,12,16,20].forEach(idx => {
+          const p = lm[idx];
+          const cx = p.x * handCanvas.width;
+          const cy = p.y * handCanvas.height;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 5.5, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(104,211,145,.88)';
+          ctx.fill();
+        });
+
+        const fingers = getExtendedFingers(lm);
+        readoutHand.textContent = hand;
+        readoutFingers.textContent = `${fingers.reduce((a,b)=>a+b,0)} / 5`;
+      });
+    }
+
+    function initMediaPipe() {
+      setStatus('Loading MediaPipe...', 'init');
+
+      const hands = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+      });
+
+      // FIX 2: modelComplexity 0 = lightweight model, ~40% less CPU. 1 is overkill for basic gestures.
+      hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 0,
+        minDetectionConfidence: 0.65,
+        minTrackingConfidence: 0.55
+      });
+
+      hands.onResults((results) => {
+        // FIX 3: Only resize canvas when dimensions actually change (not every frame)
+        if (webcamEl.videoWidth > 0 && (handCanvas.width !== webcamEl.videoWidth || handCanvas.height !== webcamEl.videoHeight)) {
+          handCanvas.width = webcamEl.videoWidth;
+          handCanvas.height = webcamEl.videoHeight;
+        }
+
+        updateFPS();
+        drawHands(results);
+
+        if (!results.multiHandLandmarks?.length) {
+          state.currentGesture = 'none';
+          state.gestureHoldName = '';
+          updateGestureUI('none', 0);
+          readoutAction.textContent = 'Waiting';
+          confidenceFill.style.width = '0%';
+          confidenceLabel.textContent = 'Confidence: —';
+          return;
+        }
+
+        const lm = results.multiHandLandmarks[0];
+
+        const swipe = detectSwipe(lm);
+        if (swipe) {
+          state.currentGesture = swipe.name;
+          updateGestureUI(swipe.name, swipe.confidence);
+          dispatchGestureAction(swipe.name);
+          return;
+        }
+
+        const wave = detectWave(lm);
+        if (wave) {
+          state.currentGesture = wave.name;
+          updateGestureUI(wave.name, wave.confidence);
+          dispatchGestureAction(wave.name);
+          return;
+        }
+
+        const { name, confidence: ruleConf } = classifyGesture(lm);
+        const mlRes = classifyGestureML(lm);
+        const displayConfidence = tfModel ? mlRes.confidence : ruleConf;
+        updateGestureUI(name, displayConfidence);
+
+        if (name === 'none') {
+          state.gestureHoldName = '';
+          state.currentGesture = 'none';
+          return;
+        }
+
+        if (name !== state.gestureHoldName) {
+          state.gestureHoldName = name;
+          state.gestureStartTime = Date.now();
+        } else {
+          const held = Date.now() - state.gestureStartTime;
+          if (held >= state.GESTURE_HOLD_MS && name !== state.currentGesture) {
+            state.currentGesture = name;
+            dispatchGestureAction(name);
+          }
+        }
+      });
+
+      return hands;
+    }
+
+    async function initWebcam(hands) {
+      setStatus('Requesting camera...', 'init');
+      try {
+        const camera = new Camera(webcamEl, {
+          onFrame: async () => {
+            // FIX 6: Skip sending frames when AI recorder is open to avoid double MediaPipe load
+            if (!state._mainPaused) await hands.send({ image: webcamEl });
+          },
+          width: 640, height: 480, facingMode: 'user'
+        });
+        await camera.start();
+        setStatus('Ready — show your hand!', 'ready');
+      } catch (err) {
+        console.warn('Camera helper failed, trying fallback...', err);
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' }, audio: false });
+          webcamEl.srcObject = stream;
+          await webcamEl.play();
+          const loop = async () => {
+            if (!state._mainPaused && webcamEl.readyState >= 2) await hands.send({ image: webcamEl });
+            requestAnimationFrame(loop);
+          };
+          requestAnimationFrame(loop);
+          setStatus('Ready (fallback mode)', 'ready');
+        } catch (e) {
+          console.error(e);
+          setStatus('Camera unavailable', 'error');
+        }
+      }
+    }
+
+    function openCustomizer() {
+      hydrateBuiltInActionSelects();
+      document.querySelectorAll('.action-select[data-gesture]').forEach(select => {
+        const g = select.dataset.gesture;
+        const row = select.closest('.customizer-row');
+        row.classList.remove('changed');
+        const preview = document.querySelector(`.cg-preview[data-gesture="${g}"]`);
+        if (preview) preview.textContent = ACTION_DEFS[gestureMappings[g]]?.label || '—';
+      });
+      renderCustomGesturesInModal();
+      customizerBackdrop.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeCustomizer() {
+      customizerBackdrop.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    function saveCustomizer() {
+      const map = {};
+      document.querySelectorAll('.action-select[data-gesture]').forEach(select => {
+        map[select.dataset.gesture] = select.value;
+      });
+      gestureMappings = { ...map };
+      renderGestureGuide();
+      closeCustomizer();
+      showToast('✓ Gesture mappings saved!');
+    }
+
+    function resetToDefaults() {
+      gestureMappings = { ...DEFAULT_GESTURE_MAPPINGS };
+      openCustomizer();
+      showToast('↺ Reset to defaults');
+    }
+
+    function renderCustomGesturesInModal() {
+      if (!customGestures.length) {
+        customGesturesSection.style.display = 'none';
+        return;
+      }
+      customGesturesSection.style.display = 'block';
+      customGesturesTable.innerHTML = '';
+
+      customGestures.forEach(cg => {
+        const row = document.createElement('div');
+        row.className = 'customizer-row';
+        row.innerHTML = `
+          <div class="customizer-gesture">
+            <span class="cg-icon">${cg.icon}</span>
+            <div>
+              <div class="cg-name">${cg.name}<span class="ai-tag-inline">AI</span></div>
+              <div class="cg-desc">${cg.description}</div>
+            </div>
+          </div>
+          <select class="action-select custom-gesture-action-select" data-custom-key="${cg.key}">
+            ${getActionOptionsHtml(cg.action)}
+          </select>
+          <button class="btn-remove-custom" data-custom-key="${cg.key}" title="Remove">✕</button>
+        `;
+        customGesturesTable.appendChild(row);
+      });
+
+      customGesturesTable.querySelectorAll('.custom-gesture-action-select').forEach(sel => {
+        sel.addEventListener('change', () => {
+          const key = sel.dataset.customKey;
+          const cg = customGestures.find(x => x.key === key);
+          if (cg) {
+            cg.action = sel.value;
+            renderGestureGuide();
+          }
+        });
+      });
+
+      customGesturesTable.querySelectorAll('.btn-remove-custom').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const key = btn.dataset.customKey;
+          customGestures = customGestures.filter(x => x.key !== key);
+          renderCustomGesturesInModal();
+          renderGestureGuide();
+          showToast('Custom gesture removed');
+        });
+      });
+    }
+
+    function wireBuiltInSelectChanges() {
+      document.querySelectorAll('.action-select[data-gesture]').forEach(select => {
+        select.addEventListener('change', () => {
+          const g = select.dataset.gesture;
+          const row = select.closest('.customizer-row');
+          const preview = document.querySelector(`.cg-preview[data-gesture="${g}"]`);
+          if (preview) preview.textContent = ACTION_DEFS[select.value]?.label || '—';
+          row.classList.toggle('changed', DEFAULT_GESTURE_MAPPINGS[g] !== select.value);
+        });
+      });
+    }
+
+    openCustomizerBtn.addEventListener('click', openCustomizer);
+    modalClose.addEventListener('click', closeCustomizer);
+    cancelMappings.addEventListener('click', closeCustomizer);
+    saveMappings.addEventListener('click', saveCustomizer);
+    resetMappings.addEventListener('click', resetToDefaults);
+    customizerBackdrop.addEventListener('click', (e) => { if (e.target === customizerBackdrop) closeCustomizer(); });
+    clearAllCustomBtn.addEventListener('click', () => {
+      customGestures = [];
+      renderCustomGesturesInModal();
+      renderGestureGuide();
+      showToast('All custom gestures removed');
+    });
+
+    const aiState = {
+      phase: 1,
+      selectedAction: null,
+      recordedLandmarks: [],
+      isRecording: false,
+      cameraStream: null,
+      currentLandmarks: null,
+      pendingResult: null
+    };
+
+    function aiShowPhase(phase) {
+      aiState.phase = phase;
+      ['aiPhase1','aiPhase2','aiPhase3','aiPhase4','aiPhaseError'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+      });
+      if (phase === 'error') document.getElementById('aiPhaseError').classList.remove('hidden');
+      else document.getElementById(`aiPhase${phase}`).classList.remove('hidden');
+
+      [1,2,3,4].forEach(n => {
+        const step = document.getElementById(`aiStep${n}`);
+        if (!step) return;
+        step.classList.remove('active', 'done');
+        if (typeof phase === 'number') {
+          if (n < phase) step.classList.add('done');
+          if (n === phase) step.classList.add('active');
+        }
+      });
+
+      aiRecorderSave.disabled = (phase !== 4);
+      aiRecorderBack.disabled = (phase === 3);
+    }
+
+    async function startAiCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width:640, height:480, facingMode:'user' }, audio:false });
+        aiState.cameraStream = stream;
+        aiRecorderWebcam.srcObject = stream;
+        await aiRecorderWebcam.play();
+
+        const handsAI = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+        // FIX 2 (also for AI recorder): use lightweight model
+        handsAI.setOptions({ maxNumHands:1, modelComplexity:0, minDetectionConfidence:0.65, minTrackingConfidence:0.55 });
+
+        handsAI.onResults((results) => {
+          // FIX 3 (AI recorder): only resize when dims change
+          if (aiRecorderWebcam.videoWidth > 0 && (aiRecorderCanvas.width !== aiRecorderWebcam.videoWidth || aiRecorderCanvas.height !== aiRecorderWebcam.videoHeight)) {
+            aiRecorderCanvas.width = aiRecorderWebcam.videoWidth;
+            aiRecorderCanvas.height = aiRecorderWebcam.videoHeight;
+          }
+          aiRecorderCtx.clearRect(0, 0, aiRecorderCanvas.width, aiRecorderCanvas.height);
+
+          if (results.multiHandLandmarks?.length) {
+            const lm = results.multiHandLandmarks[0];
+            aiState.currentLandmarks = lm;
+
+            drawConnectors(aiRecorderCtx, lm, HAND_CONNECTIONS, { color:'rgba(104,211,145,.8)', lineWidth:2 });
+            drawLandmarks(aiRecorderCtx, lm, { color:'#68d391', fillColor:'rgba(104,211,145,.35)', lineWidth:1, radius:3 });
+
+            if (aiState.phase === 2) {
+              const fingers = getExtendedFingers(lm);
+              const cnt = fingers.reduce((a,b)=>a+b,0);
+              aiHandIndicator.innerHTML = `<span>✅ Hand detected — ${cnt}/5 fingers extended</span>`;
+              aiHandIndicator.className = 'ai-hand-indicator detected';
+            }
+
+            if (aiState.isRecording) aiState.recordedLandmarks.push(lm.map(p => ({ x:p.x, y:p.y, z:p.z })));
+          } else {
+            aiState.currentLandmarks = null;
+            if (aiState.phase === 2) {
+              aiHandIndicator.innerHTML = '<span>✋ No hand detected — show your hand</span>';
+              aiHandIndicator.className = 'ai-hand-indicator';
+            }
+          }
+        });
+
+        const frameLoop = async () => {
+          if (!aiState.cameraStream) return;
+          if (aiRecorderWebcam.readyState >= 2) await handsAI.send({ image: aiRecorderWebcam });
+          aiState._raf = requestAnimationFrame(frameLoop);
+        };
+        requestAnimationFrame(frameLoop);
+      } catch (err) {
+        console.error(err);
+        showToast('⚠️ AI recorder camera unavailable');
+      }
+    }
+
+    function stopAiCamera() {
+      if (aiState._raf) cancelAnimationFrame(aiState._raf);
+      if (aiState.cameraStream) {
+        aiState.cameraStream.getTracks().forEach(t => t.stop());
+        aiState.cameraStream = null;
+      }
+    }
+
+    async function openAiRecorder() {
+      aiState.phase = 1;
+      aiState.selectedAction = null;
+      aiState.recordedLandmarks = [];
+      aiState.isRecording = false;
+      aiState.pendingResult = null;
+      aiState.currentLandmarks = null;
+
+      document.querySelectorAll('.ai-action-btn').forEach(b => b.classList.remove('selected'));
+      aiSelectedAction.textContent = 'None';
+      aiGestureName.value = '';
+      aiCountdownRing.classList.remove('active');
+      aiStartRecord.disabled = false;
+      aiStartRecord.textContent = '🎥 Start Recording (3s)';
+      aiHandIndicator.innerHTML = '<span>✋ No hand detected</span>';
+      aiHandIndicator.className = 'ai-hand-indicator';
+      aiShowPhase(1);
+
+      customizerBackdrop.classList.remove('open');
+      aiRecorderBackdrop.classList.add('open');
+      document.body.style.overflow = 'hidden';
+
+      // FIX 6: Pause main hands loop before starting AI recorder's own loop
+      state._mainPaused = true;
+      await startAiCamera();
+    }
+
+    function closeAiRecorder() {
+      stopAiCamera();
+      aiState.isRecording = false;
+      aiRecorderBackdrop.classList.remove('open');
+      document.body.style.overflow = '';
+      // FIX 6: Resume main hands loop
+      state._mainPaused = false;
+      openCustomizer();
+    }
+
+    function closeAiRecorderFully() {
+      stopAiCamera();
+      aiState.isRecording = false;
+      aiRecorderBackdrop.classList.remove('open');
+      document.body.style.overflow = '';
+      // FIX 6: Resume main hands loop
+      state._mainPaused = false;
+    }
+
+    aiActionGrid.querySelectorAll('.ai-action-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        aiActionGrid.querySelectorAll('.ai-action-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        aiState.selectedAction = btn.dataset.action;
+        aiSelectedAction.textContent = btn.textContent;
+        aiShowPhase(2);
+      });
+    });
+
+    function renderLandmarkPreview(lm) {
+      aiLandmarkPreview.innerHTML = '';
+      const c = document.createElement('canvas');
+      c.width = 120; c.height = 120;
+      c.style.borderRadius = '8px';
+      c.style.background = 'rgba(37,99,235,.05)';
+      c.style.border = '1px solid rgba(37,99,235,.15)';
+      const g = c.getContext('2d');
+
+      const xs = lm.map(p => p.x), ys = lm.map(p => p.y);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+      const rx = maxX - minX || 1, ry = maxY - minY || 1;
+      const pad = 10;
+      const map = p => ({
+        x: pad + ((p.x - minX) / rx) * (120 - pad * 2),
+        y: pad + ((p.y - minY) / ry) * (120 - pad * 2)
+      });
+
+      HAND_CONNECTIONS.forEach(([a,b]) => {
+        const p1 = map(lm[a]), p2 = map(lm[b]);
+        g.beginPath(); g.moveTo(p1.x,p1.y); g.lineTo(p2.x,p2.y);
+        g.strokeStyle = 'rgba(37,99,235,.45)'; g.lineWidth = 1.5; g.stroke();
+      });
+
+      lm.forEach((p, i) => {
+        const m = map(p);
+        g.beginPath(); g.arc(m.x, m.y, [4,8,12,16,20].includes(i)?4:2.4, 0, Math.PI*2);
+        g.fillStyle = [4,8,12,16,20].includes(i) ? '#10b981' : '#8b5cf6';
+        g.fill();
+      });
+
+      aiLandmarkPreview.appendChild(c);
+    }
+
+    function generateFallbackResult(pattern, fingerDesc) {
+      const count = pattern.reduce((a,b)=>a+b,0);
+      const names = ['Thumb','Index','Middle','Ring','Pinky'];
+      const ext = names.filter((_,i)=>pattern[i]===1);
+
+      let name = 'Custom Gesture', emoji = '🤚';
+      if (count === 2 && pattern[1] && pattern[2]) { name = 'Peace Sign'; emoji = '✌️'; }
+      else if (count === 3 && pattern[0] && pattern[1] && pattern[4]) { name = 'Rock Sign'; emoji = '🤟'; }
+      else if (count === 0) { name = 'Closed Fist'; emoji = '✊'; }
+      else if (count >= 4) { name = 'Open Palm'; emoji = '🖐️'; }
+
+      return {
+        gestureName: name,
+        description: `Hand pose with ${ext.join(', ') || 'no fingers'} extended.`,
+        emoji,
+        confidence: 0.75,
+        fingerSummary: fingerDesc,
+        fingerPattern: pattern
+      };
+    }
+
+    async function analyzeWithAI() {
+      aiShowPhase(3);
+
+      const all = aiState.recordedLandmarks.map(lm => getExtendedFingers(lm));
+      const median = [0,1,2,3,4].map(i => {
+        const vals = all.map(p => p[i]);
+        return vals.filter(v=>v===1).length > vals.length / 2 ? 1 : 0;
+      });
+
+      const mid = aiState.recordedLandmarks[Math.floor(aiState.recordedLandmarks.length / 2)];
+      renderLandmarkPreview(mid);
+
+      const fingerNames = ['Thumb','Index','Middle','Ring','Pinky'];
+      const fingerDesc = median.map((v,i)=>`${fingerNames[i]}: ${v ? 'extended' : 'folded'}`).join(', ');
+
+      try {
+        aiAnalyzingMsg.textContent = 'Analyzing gesture pattern...';
+        await new Promise(r => setTimeout(r, 850)); // lightweight local analyze
+        aiState.pendingResult = generateFallbackResult(median, fingerDesc);
+        showAiResult();
+      } catch (err) {
+        console.error(err);
+        showAiError('Analysis failed. Please try again.');
+      }
+    }
+
+    function showAiResult() {
+      const r = aiState.pendingResult;
+      if (!r) return;
+
+      aiResultIcon.textContent = r.emoji;
+      aiResultName.textContent = r.gestureName;
+      aiResultDesc.textContent = r.description;
+      aiResultAction.textContent = ACTION_DEFS[aiState.selectedAction]?.label || '—';
+      aiGestureName.value = r.gestureName;
+
+      aiFingerViz.innerHTML = '';
+      const labels = ['👍 Thumb','☝️ Index','🖕 Middle','💍 Ring','🤙 Pinky'];
+      r.fingerPattern.forEach((v, i) => {
+        const chip = document.createElement('span');
+        chip.className = `finger-chip ${v ? 'extended' : 'folded'}`;
+        chip.textContent = `${labels[i]} ${v ? '✓' : '✗'}`;
+        aiFingerViz.appendChild(chip);
+      });
+
+      aiShowPhase(4);
+    }
+
+    function showAiError(msg) {
+      document.getElementById('aiErrorMsg').textContent = msg;
+      aiShowPhase('error');
+    }
+
+    aiStartRecord.addEventListener('click', () => {
+      if (!aiState.selectedAction) {
+        showToast('Please choose an action first');
+        aiShowPhase(1);
+        return;
+      }
+      if (!aiState.currentLandmarks) {
+        showToast('⚠️ Show your hand to the camera first');
+        return;
+      }
+
+      aiState.recordedLandmarks = [];
+      aiState.isRecording = true;
+      aiStartRecord.disabled = true;
+      aiStartRecord.textContent = '⏺ Recording...';
+      aiCountdownRing.classList.add('active');
+
+      const circ = 2 * Math.PI * 44;
+      aiRingFill.style.strokeDasharray = circ;
+      aiRingFill.style.strokeDashoffset = circ;
+
+      const total = 3000;
+      const started = Date.now();
+      let secondsLeft = 3;
+      aiCountdownNum.textContent = secondsLeft;
+
+      const animate = () => {
+        const elapsed = Date.now() - started;
+        const p = Math.min(elapsed / total, 1);
+        aiRingFill.style.strokeDashoffset = circ * (1 - p);
+        const secs = Math.ceil((total - elapsed) / 1000);
+        if (secs !== secondsLeft && secs > 0) {
+          secondsLeft = secs;
+          aiCountdownNum.textContent = secs;
+        }
+        if (p < 1) requestAnimationFrame(animate);
+      };
+      requestAnimationFrame(animate);
+
+      clearTimeout(aiState._countdownTimer);
+      aiState._countdownTimer = setTimeout(async () => {
+        aiState.isRecording = false;
+        aiCountdownRing.classList.remove('active');
+        aiCountdownNum.textContent = '✓';
+        aiStartRecord.textContent = '✓ Captured!';
+
+        if (aiState.recordedLandmarks.length < 2) {
+          showAiError('Not enough frames captured. Keep your hand visible and retry.');
+          return;
+        }
+        await analyzeWithAI();
+      }, total);
+    });
+
+    aiRetryBtn.addEventListener('click', () => {
+      aiState.recordedLandmarks = [];
+      aiState.isRecording = false;
+      aiStartRecord.disabled = false;
+      aiStartRecord.textContent = '🎥 Start Recording (3s)';
+      aiCountdownRing.classList.remove('active');
+      aiShowPhase(2);
+    });
+
+    aiRecorderBack.addEventListener('click', () => {
+      if (aiState.phase === 2) aiShowPhase(1);
+      else if (aiState.phase === 4 || aiState.phase === 'error') {
+        aiState.recordedLandmarks = [];
+        aiState.isRecording = false;
+        aiStartRecord.disabled = false;
+        aiStartRecord.textContent = '🎥 Start Recording (3s)';
+        aiCountdownRing.classList.remove('active');
+        aiShowPhase(2);
+      } else closeAiRecorder();
+    });
+
+    aiRecorderSave.addEventListener('click', () => {
+      const r = aiState.pendingResult;
+      if (!r || !aiState.selectedAction) return;
+
+      const customName = aiGestureName.value.trim() || r.gestureName;
+      const key = `custom_${Date.now()}`;
+      const newGesture = {
+        key,
+        name: customName,
+        icon: r.emoji,
+        description: r.description,
+        fingerPattern: r.fingerPattern,
+        action: aiState.selectedAction
+      };
+
+      customGestures.push(newGesture);
+      renderGestureGuide();
+
+      closeAiRecorder();
+      showToast(`🤖 Custom gesture "${customName}" saved!`);
+    });
+
+    aiRecorderClose.addEventListener('click', closeAiRecorderFully);
+    aiRecorderCancel.addEventListener('click', closeAiRecorder);
+    aiRecorderBackdrop.addEventListener('click', (e) => { if (e.target === aiRecorderBackdrop) closeAiRecorder(); });
+    openAiRecorderBtn.addEventListener('click', openAiRecorder);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (aiRecorderBackdrop.classList.contains('open')) closeAiRecorder();
+      else if (customizerBackdrop.classList.contains('open')) closeCustomizer();
+    });
+
+    async function boot() {
+      renderGestureGuide();
+      hydrateBuiltInActionSelects();
+      wireBuiltInSelectChanges(); // must run after hydrate so selects have options
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setStatus('Browser not supported', 'error');
+        return;
+      }
+
+      if (location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(location.hostname)) {
+        setStatus('HTTPS required for camera', 'error');
+      }
+
+      const hands = initMediaPipe();
+      await new Promise(r => setTimeout(r, 250));
+      await initWebcam(hands);
+    }
+
+    boot();
+  </script>
+</body>
+</html>
